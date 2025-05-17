@@ -2,7 +2,7 @@
 // ✅ 목적: 2025년 5월 학교 발주 현황을 달력 형태로 표시
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
+import { db } from "../lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 
