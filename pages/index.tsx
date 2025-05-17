@@ -20,14 +20,16 @@ const getShortName = (full: string) => {
 };
 
 const getKg = (수량: number, 규격: string) => {
-  const match = 규격.match(/(\\d+(\\.\\d+)?)kg/);
+  const match = 규격.match(/(\d+(\.\d+)?)kg/);
   const unit = match ? parseFloat(match[1]) : 1;
   return (수량 * unit).toFixed(1);
 };
 
 export default function Home() {
+  const now = new Date();
+  const defaultYM = format(now, "yyyy-MM");
+  const [selectedYM, setSelectedYM] = useState(defaultYM);
   const [calendarData, setCalendarData] = useState<Record<string, any[]>>({});
-  const [selectedYM, setSelectedYM] = useState("2025-05");
   const [filterVendor, setFilterVendor] = useState("전체");
   const vendors = ["전체", "이가에프엔비", "에스에이치유통"];
 
@@ -61,7 +63,7 @@ export default function Home() {
 
   const start = startOfMonth(parse(selectedYM + "-01", "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
-  const days = eachDayOfInterval({ start, end });
+  const days = eachDayOfInterval({ start, end }).filter(d => getDay(d) !== 0 && getDay(d) !== 6); // exclude Sunday(0) and Saturday(6)
 
   const handleExcelDownload = () => {
     const rows: any[] = [];
@@ -82,13 +84,7 @@ export default function Home() {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
         <div>
           <select value={selectedYM} onChange={(e) => setSelectedYM(e.target.value)} className="border p-2 rounded">
-            {[
-              "2025-04",
-              "2025-05",
-              "2025-06",
-              "2025-07",
-              "2025-08"
-            ].map((ym) => (
+            {["2025-04", "2025-05", "2025-06", "2025-07", "2025-08"].map((ym) => (
               <option key={ym} value={ym}>{ym}</option>
             ))}
           </select>
@@ -108,15 +104,8 @@ export default function Home() {
       </div>
 
       <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
-      <div className="grid grid-cols-7 gap-2 text-sm font-medium text-center text-gray-700 mb-2">
-        {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
-          <div key={d} className="bg-gray-100 py-2 rounded">{d}</div>
-        ))}
-      </div>
 
-      <div className="grid grid-cols-7 gap-2 text-xs">
-        {Array(getDay(start)).fill(null).map((_, i) => (<div key={`empty-${i}`} />))}
-
+      <div className="grid grid-cols-5 gap-2 text-xs">
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const items = (calendarData[dateStr] || []).filter(
@@ -146,7 +135,7 @@ export default function Home() {
               className="border border-gray-300 rounded p-2 h-40 overflow-auto shadow-sm"
             >
               <div className="font-bold mb-1">{format(day, "d")}</div>
-              {getDay(day) === 6 ? null : content} {/* 토요일은 비워둠 */}
+              {content}
             </div>
           );
         })}
