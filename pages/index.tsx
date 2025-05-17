@@ -65,7 +65,7 @@ export default function Home() {
   const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
   const allDays = eachDayOfInterval({ start, end }).filter(d => getDay(d) >= 1 && getDay(d) <= 5);
-  const leadingEmpty = Array(getDay(start) - 1).fill(null);
+  const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null); // 보정
 
   const handleExcelDownload = () => {
     const rows: any[] = [];
@@ -144,7 +144,7 @@ export default function Home() {
               key={dateStr}
               className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm whitespace-pre-wrap"
             >
-              <div className="font-bold mb-1">{format(day, "d`)}</div>
+              <div className="font-bold mb-1">{format(day, "d")}</div>
               {content}
             </div>
           );
