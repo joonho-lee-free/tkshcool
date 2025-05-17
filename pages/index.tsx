@@ -32,7 +32,7 @@ export default function Home() {
   const [selectedYM, setSelectedYM] = useState(defaultYM);
   const [calendarData, setCalendarData] = useState<Record<string, any[]>>({});
   const [filterVendor, setFilterVendor] = useState("전체");
-  const vendors = ["전체", "이가에프엔비", "에스에이치유통"];
+  const [vendors, setVendors] = useState<string[]>(["전체"]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,8 +40,11 @@ export default function Home() {
       const filtered = snapshot.docs.filter((doc) => doc.id.startsWith(selectedYM.replace("-", "").slice(2)));
 
       const temp: Record<string, any[]> = {};
+      const vendorSet = new Set<string>();
+
       filtered.forEach((doc) => {
         const data = doc.data();
+        vendorSet.add(data.낙찰기업);
         data.품목.forEach((item: any) => {
           Object.entries(item.납품).forEach(([date, delivery]: [string, any]) => {
             if (!temp[date]) temp[date] = [];
@@ -58,6 +61,7 @@ export default function Home() {
       });
 
       setCalendarData(temp);
+      setVendors(["전체", ...Array.from(vendorSet)]);
     };
     fetchData();
   }, [selectedYM]);
@@ -86,7 +90,7 @@ export default function Home() {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
         <div>
           <select value={selectedYM} onChange={(e) => setSelectedYM(e.target.value)} className="border p-2 rounded">
-            {["2025-04", "2025-05", "2025-06", "2025-07", "2025-08"].map((ym) => (
+            {["2025-04", "2025-05", "2025-06", "2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12"].map((ym) => (
               <option key={ym} value={ym}>{ym}</option>
             ))}
           </select>
