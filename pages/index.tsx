@@ -147,7 +147,7 @@ export default function Home() {
               key={dateStr}
               className="border border-gray-300 rounded p-2 h-40 overflow-auto shadow-sm"
             >
-              <div className="font-bold mb-1">{format(day, "d`)}</div>
+              <div className="font-bold mb-1">{format(day, "d")}</div>
               {content}
             </div>
           );
