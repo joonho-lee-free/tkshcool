@@ -11,13 +11,8 @@ import {
   eachDayOfInterval,
   getDay,
   parse,
-  addDays,
 } from "date-fns";
 import * as XLSX from "xlsx";
-
-const getShortName = (full: string) => {
-  return full.substring(0, 6);
-};
 
 const getKg = (수량: number, 규격: string) => {
   const match = 규격.match(/(\d+(\.\d+)?)kg/);
@@ -69,9 +64,8 @@ export default function Home() {
 
   const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
-  const allDays = eachDayOfInterval({ start, end });
-  const mondayBased = addDays(start, (1 + 7 - getDay(start)) % 7); // align to Monday if needed
-  const days = allDays.filter(d => getDay(d) !== 0 && getDay(d) !== 6);
+  const allDays = eachDayOfInterval({ start, end }).filter(d => getDay(d) >= 1 && getDay(d) <= 5);
+  const leadingEmpty = Array(getDay(start) - 1).fill(null);
 
   const handleExcelDownload = () => {
     const rows: any[] = [];
@@ -88,7 +82,7 @@ export default function Home() {
   };
 
   return (
-    <div className="p-4 max-w-screen-lg mx-auto">
+    <div className="p-4 max-w-screen-xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
         <div>
           <select value={selectedYM} onChange={(e) => setSelectedYM(e.target.value)} className="border p-2 rounded">
@@ -120,7 +114,8 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-5 gap-2 text-xs">
-        {days.map((day) => {
+        {leadingEmpty.map((_, i) => <div key={`empty-${i}`} />)}
+        {allDays.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const items = (calendarData[dateStr] || []).filter(
             (i) => filterVendor === "전체" || i.낙찰기업 === filterVendor
@@ -129,9 +124,8 @@ export default function Home() {
           const grouped: Record<string, { 낙찰기업: string, lines: string[] }> = {};
           items.forEach((i) => {
             const school = i.발주처;
-            const short = getShortName(i.식품명);
             const kg = getKg(i.수량, i.규격);
-            const line = `${short} (${kg})`;
+            const line = `${i.식품명} (${kg})`;
             if (!grouped[school]) grouped[school] = { 낙찰기업: i.낙찰기업, lines: [] };
             grouped[school].lines.push(line);
           });
@@ -148,9 +142,9 @@ export default function Home() {
           return (
             <div
               key={dateStr}
-              className="border border-gray-300 rounded p-2 h-40 overflow-auto shadow-sm"
+              className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm whitespace-pre-wrap"
             >
-              <div className="font-bold mb-1">{format(day, "d")}</div>
+              <div className="font-bold mb-1">{format(day, "d`)}</div>
               {content}
             </div>
           );
