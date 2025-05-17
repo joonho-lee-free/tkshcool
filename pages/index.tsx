@@ -11,6 +11,7 @@ import {
   eachDayOfInterval,
   getDay,
   parse,
+  addDays,
 } from "date-fns";
 import * as XLSX from "xlsx";
 
@@ -66,9 +67,11 @@ export default function Home() {
     fetchData();
   }, [selectedYM]);
 
-  const start = startOfMonth(parse(selectedYM + "-01", "yyyy-MM-dd", new Date()));
+  const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
-  const days = eachDayOfInterval({ start, end }).filter(d => getDay(d) !== 0 && getDay(d) !== 6);
+  const allDays = eachDayOfInterval({ start, end });
+  const mondayBased = addDays(start, (1 + 7 - getDay(start)) % 7); // align to Monday if needed
+  const days = allDays.filter(d => getDay(d) !== 0 && getDay(d) !== 6);
 
   const handleExcelDownload = () => {
     const rows: any[] = [];
