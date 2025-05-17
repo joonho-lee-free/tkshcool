@@ -1,5 +1,5 @@
 // ✅ 파일명: pages/index.tsx
-// ✅ 목적: 발주현황 달력 + 연월 선택 + 낙찰업체 필터 + 엑셀 다운로드 포함
+// ✅ 목적: 발주현황 달력 + 연월 선택 + 낙찰업체 필터 + 엑셀 다운로드 + 색상/표기 규칙 반영
 
 import { useEffect, useState } from "react";
 import { db } from "../lib/firebase";
@@ -15,14 +15,19 @@ import {
 import * as XLSX from "xlsx";
 
 const getShortName = (full: string) => {
-  const paren = full.indexOf("(");
-  return paren >= 0 ? full.substring(0, paren) : full;
+  return full.substring(0, 6);
 };
 
 const getKg = (수량: number, 규격: string) => {
   const match = 규격.match(/(\d+(\.\d+)?)kg/);
   const unit = match ? parseFloat(match[1]) : 1;
-  return (수량 * unit).toFixed(1);
+  return `${(수량 * unit).toFixed(1)}kg`;
+};
+
+const getColorClass = (vendor: string) => {
+  if (vendor.includes("에스에이치유통")) return "text-blue-600";
+  if (vendor.includes("이가에프엔비")) return "text-black";
+  return "text-gray-700";
 };
 
 export default function Home() {
@@ -36,7 +41,7 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       const snapshot = await getDocs(collection(db, "school"));
-      const filtered = snapshot.docs.filter((doc) => doc.id.startsWith(selectedYM.replace("-", "")));
+      const filtered = snapshot.docs.filter((doc) => doc.id.startsWith(selectedYM.replace("-", "").slice(2)));
 
       const temp: Record<string, any[]> = {};
       filtered.forEach((doc) => {
@@ -63,7 +68,7 @@ export default function Home() {
 
   const start = startOfMonth(parse(selectedYM + "-01", "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
-  const days = eachDayOfInterval({ start, end }).filter(d => getDay(d) !== 0 && getDay(d) !== 6); // exclude Sunday(0) and Saturday(6)
+  const days = eachDayOfInterval({ start, end }).filter(d => getDay(d) !== 0 && getDay(d) !== 6);
 
   const handleExcelDownload = () => {
     const rows: any[] = [];
@@ -105,6 +110,12 @@ export default function Home() {
 
       <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
 
+      <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
+        {["월", "화", "수", "목", "금"].map((day) => (
+          <div key={day} className="bg-gray-100 py-1 rounded">{day}</div>
+        ))}
+      </div>
+
       <div className="grid grid-cols-5 gap-2 text-xs">
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
@@ -112,20 +123,22 @@ export default function Home() {
             (i) => filterVendor === "전체" || i.낙찰기업 === filterVendor
           );
 
-          const grouped: Record<string, string[]> = {};
+          const grouped: Record<string, { 낙찰기업: string, lines: string[] }> = {};
           items.forEach((i) => {
             const school = i.발주처;
             const short = getShortName(i.식품명);
             const kg = getKg(i.수량, i.규격);
-            const line = `- ${short} (${kg}kg)`;
-            if (!grouped[school]) grouped[school] = [];
-            grouped[school].push(line);
+            const line = `${short} (${kg})`;
+            if (!grouped[school]) grouped[school] = { 낙찰기업: i.낙찰기업, lines: [] };
+            grouped[school].lines.push(line);
           });
 
-          const content = Object.entries(grouped).map(([school, lines]) => (
-            <div key={school} className="mb-1">
+          const content = Object.entries(grouped).map(([school, obj]) => (
+            <div key={school} className={`mb-1 ${getColorClass(obj.낙찰기업)}`}>
               <span className="font-semibold">{school}</span>
-              {lines.map((line, idx) => <div key={idx} className="pl-2">{line}</div>)}
+              <ul className="pl-2">
+                {obj.lines.map((line, idx) => <li key={idx}>- {line}</li>)}
+              </ul>
             </div>
           ));
 
@@ -134,7 +147,7 @@ export default function Home() {
               key={dateStr}
               className="border border-gray-300 rounded p-2 h-40 overflow-auto shadow-sm"
             >
-              <div className="font-bold mb-1">{format(day, "d")}</div>
+              <div className="font-bold mb-1">{format(day, "d`)}</div>
               {content}
             </div>
           );
