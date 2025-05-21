@@ -10,6 +10,7 @@ import {
   parse,
 } from "date-fns";
 import * as XLSX from "xlsx";
+import { generateTransactionExcel } from "../lib/TransactionExcel";
 
 const getKg = (수량, 규격) => {
   const match = 규격?.match(/(\d+(\.\d+)?)kg/);
@@ -55,7 +56,7 @@ export default function Home() {
               식품명: item.식품명,
               규격: item.규격,
               낙찰기업,
-              수량: delivery.수량,
+              수량: (delivery as any).수량,
               단가: item.단가,
               날짜: date,
             });
@@ -75,26 +76,6 @@ export default function Home() {
     (d) => getDay(d) >= 1 && getDay(d) <= 5
   );
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
-
-  const handleExcelDownload = () => {
-    const rows = [];
-    Object.entries(calendarData).forEach(([date, items]) => {
-      items.forEach((i) => {
-        if (filterVendor !== "전체" && i.낙찰기업 !== filterVendor) return;
-        rows.push({
-          날짜: date,
-          낙찰기업: i.낙찰기업,
-          발주처: i.발주처,
-          품목: i.식품명,
-          수량: i.수량,
-        });
-      });
-    });
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "발주현황");
-    XLSX.writeFile(wb, `${selectedYM}_발주현황.xlsx`);
-  };
 
   const handleClickSchool = async (school, vendor, date) => {
     const ym = selectedYM.replace("-", "").slice(2);
@@ -131,7 +112,8 @@ export default function Home() {
         return;
       }
 
-      const lineItems = matchedItems.map((item) => ({
+      const lineItems = matchedItems.map((item, index) => ({
+        번호: index + 1,
         품명: item.식품명,
         규격: item.규격,
         수량: item.납품[date].수량,
@@ -139,41 +121,12 @@ export default function Home() {
         공급가액: item.납품[date].수량 * item.단가,
       }));
 
-      const res = await fetch("/거래명세표.xlsx");
-      if (!res.ok) {
-        alert("❌ 거래명세표 템플릿 로드 실패");
-        return;
-      }
-
-      const templateBuffer = await res.arrayBuffer();
-      const wb = XLSX.read(templateBuffer, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-
-      ws["C5"].v = schoolData.발주처 || "";
-      ws["C6"].v = schoolData.사업장주소 || "";
-      ws["C7"].v = schoolData.대표전화번호 || "";
-      ws["C8"].v = vendorData.상호명 || vendorData.상호 || "";
-      ws["C9"].v = vendorData.주소 || "";
-      ws["F5"].v = vendorData.대표자 || "";
-      ws["F6"].v = vendorData.대표전화 || vendorData.대표전화번호 || "";
-
-      let 합계 = 0;
-      lineItems.forEach((item, i) => {
-        const r = 12 + i;
-        ws[`A${r}`] = { v: "25" };
-        ws[`B${r}`] = { v: date.split("-")[1] };
-        ws[`C${r}`] = { v: date.split("-")[2] };
-        ws[`D${r}`] = { v: item.품명 };
-        ws[`E${r}`] = { v: item.규격 };
-        ws[`F${r}`] = { v: item.수량 };
-        ws[`G${r}`] = { v: item.단가 };
-        ws[`H${r}`] = { v: item.공급가액 };
-        합계 += item.공급가액;
+      await generateTransactionExcel({
+        date,
+        발주처: schoolData,
+        낙찰기업: vendorData,
+        품목들: lineItems,
       });
-
-      ws["F4"].v = 합계;
-      XLSX.writeFile(wb, `${school}_${date}_거래명세표.xlsx`);
-      console.log("✅ 거래명세표 생성 완료");
     } catch (err) {
       alert("❗ 오류 발생, 콘솔 확인");
       console.error("🔥 오류:", err);
