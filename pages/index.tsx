@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "../lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import {
   format,
   startOfMonth,
@@ -48,19 +48,18 @@ export default function Home() {
         vendorSet.add(낙찰기업);
 
         data.품목?.forEach((item: any) => {
-          Object.entries(item.납품 || {}).forEach(
-            ([date, delivery]: [string, any]) => {
-              if (!temp[date]) temp[date] = [];
-              temp[date].push({
-                발주처,
-                식품명: item.식품명,
-                규격: item.규격,
-                낙찰기업,
-                수량: delivery.수량,
-                날짜: date,
-              });
-            }
-          );
+          Object.entries(item.납품 || {}).forEach(([date, delivery]: [string, any]) => {
+            if (!temp[date]) temp[date] = [];
+            temp[date].push({
+              발주처,
+              식품명: item.식품명,
+              규격: item.규격,
+              낙찰기업,
+              수량: delivery.수량,
+              단가: item.단가,
+              날짜: date,
+            });
+          });
         });
       });
 
@@ -97,6 +96,68 @@ export default function Home() {
     XLSX.writeFile(wb, `${selectedYM}_발주현황.xlsx`);
   };
 
+  const handleClickSchool = async (school: string, vendor: string, date: string) => {
+    const ym = selectedYM.replace("-", "");
+    const docId = `${ym}_${school}`;
+    const schoolRef = doc(db, "school", docId);
+    const vendorRef = doc(db, "school", vendor);
+
+    const [schoolSnap, vendorSnap] = await Promise.all([
+      getDoc(schoolRef),
+      getDoc(vendorRef),
+    ]);
+
+    if (!schoolSnap.exists() || !vendorSnap.exists()) {
+      alert("데이터 없음");
+      return;
+    }
+
+    const schoolData = schoolSnap.data();
+    const vendorData = vendorSnap.data();
+    const matchedItems = (schoolData.품목 || []).filter((item: any) =>
+      item.납품?.[date]
+    );
+
+    const lineItems = matchedItems.map((item: any) => ({
+      품명: item.식품명,
+      규격: item.규격,
+      수량: item.납품[date].수량,
+      단가: item.단가,
+      공급가액: item.납품[date].수량 * item.단가,
+    }));
+
+    const res = await fetch("/거래명세표.xlsx");
+    const templateBuffer = await res.arrayBuffer();
+
+    const wb = XLSX.read(templateBuffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+
+    ws["C5"].v = schoolData.발주처 || "";
+    ws["C6"].v = schoolData.사업장주소 || "";
+    ws["C7"].v = schoolData.대표전화번호 || "";
+    ws["C8"].v = vendorData.상호명 || vendorData.상호 || "";
+    ws["C9"].v = vendorData.주소 || "";
+    ws["F5"].v = vendorData.대표자 || "";
+    ws["F6"].v = vendorData.대표전화 || vendorData.대표전화번호 || "";
+
+    let 합계 = 0;
+    lineItems.forEach((item, i) => {
+      const r = 12 + i;
+      ws[`A${r}`] = { v: "25" };
+      ws[`B${r}`] = { v: date.split("-")[1] };
+      ws[`C${r}`] = { v: date.split("-")[2] };
+      ws[`D${r}`] = { v: item.품명 };
+      ws[`E${r}`] = { v: item.규격 };
+      ws[`F${r}`] = { v: item.수량 };
+      ws[`G${r}`] = { v: item.단가 };
+      ws[`H${r}`] = { v: item.공급가액 };
+      합계 += item.공급가액;
+    });
+
+    ws["F4"].v = 합계;
+    XLSX.writeFile(wb, `${schoolData.발주처}_${date}_거래명세표.xlsx`);
+  };
+
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
@@ -106,17 +167,7 @@ export default function Home() {
             onChange={(e) => setSelectedYM(e.target.value)}
             className="border p-2 rounded"
           >
-            {[
-              "2025-04",
-              "2025-05",
-              "2025-06",
-              "2025-07",
-              "2025-08",
-              "2025-09",
-              "2025-10",
-              "2025-11",
-              "2025-12",
-            ].map((ym) => (
+            {["2025-04", "2025-05", "2025-06", "2025-07", "2025-08"].map((ym) => (
               <option key={ym} value={ym}>
                 {ym}
               </option>
@@ -170,23 +221,19 @@ export default function Home() {
             string,
             { 발주처: string; 낙찰기업: string; lines: string[] }
           > = {};
-
           items.forEach((i) => {
-            const school = i.발주처 || "학교명없음";
-            const vendor = i.낙찰기업;
-            const key = `${school}__${vendor}`;
+            const key = `${i.발주처}__${i.낙찰기업}`;
             const line = `${i.식품명} (${getKg(i.수량, i.규격)})`;
             if (!grouped[key]) {
               grouped[key] = {
-                발주처: school,
-                낙찰기업: vendor,
+                발주처: i.발주처,
+                낙찰기업: i.낙찰기업,
                 lines: [],
               };
             }
             grouped[key].lines.push(line);
           });
 
-          // 🎯 수정된 정렬: 낙찰기업 우선 → 학교 오름차순
           const sortedGrouped = Object.entries(grouped).sort(([, a], [, b]) => {
             const vendorPriority = (v: string) =>
               v.includes("이가에프엔비") ? 1 : v.includes("에스에이치유통") ? 2 : 3;
@@ -197,8 +244,12 @@ export default function Home() {
           });
 
           const content = sortedGrouped.map(([key, obj]) => (
-            <div key={key} className={`mb-1 ${getColorClass(obj.낙찰기업)}`}>
-              <span className="font-semibold">{obj.발주처}</span>
+            <div
+              key={key}
+              className={`mb-1 ${getColorClass(obj.낙찰기업)} cursor-pointer`}
+              onClick={() => handleClickSchool(obj.발주처, obj.낙찰기업, dateStr)}
+            >
+              <span className="font-semibold underline">{obj.발주처}</span>
               <ul className="pl-2">
                 {obj.lines.map((line, idx) => (
                   <li key={idx}>- {line}</li>
