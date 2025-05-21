@@ -1,5 +1,5 @@
 // ✅ 파일명: pages/index.tsx
-// ✅ 목적: 발주현황 달력 + 연월 선택 + 낙찰업체 필터 + 엑셀 다운로드 + 색상/표기 규칙 반영 + 발주처 누락 대응
+// ✅ 목적: 발주현황 달력 (스크롤 없이 표시 + 납품처 정렬)
 
 import { useEffect, useState } from "react";
 import { db } from "../lib/firebase";
@@ -51,7 +51,7 @@ export default function Home() {
           Object.entries(item.납품).forEach(([date, delivery]: [string, any]) => {
             if (!temp[date]) temp[date] = [];
             temp[date].push({
-              발주처: item.발주처,
+              발주처: item.발주처 || "학교명없음",
               식품명: item.식품명,
               규격: item.규격,
               낙찰기업: data.낙찰기업,
@@ -83,7 +83,7 @@ export default function Home() {
         rows.push({
           날짜: date,
           낙찰기업: i.낙찰기업,
-          발주처: i.발주처 || "학교명없음",
+          발주처: i.발주처,
           품목: i.식품명,
           수량: i.수량,
         });
@@ -164,7 +164,11 @@ export default function Home() {
             (i) => filterVendor === "전체" || i.낙찰기업 === filterVendor
           );
 
-          const grouped: Record<string, { 낙찰기업: string; lines: string[] }> = {};
+          // 학교 기준으로 그룹핑
+          const grouped: Record<
+            string,
+            { 낙찰기업: string; lines: string[] }
+          > = {};
           items.forEach((i) => {
             const school = i.발주처 || "학교명없음";
             const kg = getKg(i.수량, i.규격);
@@ -174,7 +178,15 @@ export default function Home() {
             grouped[school].lines.push(line);
           });
 
-          const content = Object.entries(grouped).map(([school, obj]) => (
+          // 낙찰기업 순서대로 정렬: 이가에프엔비(검정) → 에스에이치유통(파랑)
+          const sortedGrouped = Object.entries(grouped).sort(([, a], [, b]) => {
+            const priority = (vendor: string) =>
+              vendor.includes("이가에프엔비") ? 1 :
+              vendor.includes("에스에이치유통") ? 2 : 3;
+            return priority(a.낙찰기업) - priority(b.낙찰기업);
+          });
+
+          const content = sortedGrouped.map(([school, obj]) => (
             <div key={school} className={`mb-1 ${getColorClass(obj.낙찰기업)}`}>
               <span className="font-semibold">{school}</span>
               <ul className="pl-2">
@@ -188,7 +200,7 @@ export default function Home() {
           return (
             <div
               key={dateStr}
-              className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm whitespace-pre-wrap"
+              className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm whitespace-pre-wrap overflow-hidden"
             >
               <div className="font-bold mb-1">{format(day, "d")}</div>
               {content}
