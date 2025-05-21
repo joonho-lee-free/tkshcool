@@ -1,6 +1,3 @@
-// ✅ 파일명: pages/index.tsx
-// ✅ 목적: 발주현황 달력 (스크롤 없이 표시 + 납품처 정렬)
-
 import { useEffect, useState } from "react";
 import { db } from "../lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
@@ -15,7 +12,7 @@ import {
 import * as XLSX from "xlsx";
 
 const getKg = (수량: number, 규격: string) => {
-  const match = 규격.match(/(\d+(\.\d+)?)kg/);
+  const match = 규격?.match(/(\d+(\.\d+)?)kg/);
   const unit = match ? parseFloat(match[1]) : 1;
   return `${(수량 * unit).toFixed(1)}kg`;
 };
@@ -46,19 +43,24 @@ export default function Home() {
 
       filtered.forEach((doc) => {
         const data = doc.data();
-        vendorSet.add(data.낙찰기업);
-        data.품목.forEach((item: any) => {
-          Object.entries(item.납품).forEach(([date, delivery]: [string, any]) => {
-            if (!temp[date]) temp[date] = [];
-            temp[date].push({
-              발주처: item.발주처 || "학교명없음",
-              식품명: item.식품명,
-              규격: item.규격,
-              낙찰기업: data.낙찰기업,
-              수량: delivery.수량,
-              날짜: date,
-            });
-          });
+        const 발주처 = data.발주처 || "학교명없음";
+        const 낙찰기업 = data.낙찰기업 || "업체미지정";
+        vendorSet.add(낙찰기업);
+
+        data.품목?.forEach((item: any) => {
+          Object.entries(item.납품 || {}).forEach(
+            ([date, delivery]: [string, any]) => {
+              if (!temp[date]) temp[date] = [];
+              temp[date].push({
+                발주처,
+                식품명: item.식품명,
+                규격: item.규격,
+                낙찰기업,
+                수량: delivery.수량,
+                날짜: date,
+              });
+            }
+          );
         });
       });
 
@@ -68,7 +70,9 @@ export default function Home() {
     fetchData();
   }, [selectedYM]);
 
-  const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
+  const start = startOfMonth(
+    parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date())
+  );
   const end = endOfMonth(start);
   const allDays = eachDayOfInterval({ start, end }).filter(
     (d) => getDay(d) >= 1 && getDay(d) <= 5
@@ -164,31 +168,40 @@ export default function Home() {
             (i) => filterVendor === "전체" || i.낙찰기업 === filterVendor
           );
 
-          // 학교 기준으로 그룹핑
+          // 학교 + 낙찰기업으로 그룹핑
           const grouped: Record<
             string,
-            { 낙찰기업: string; lines: string[] }
+            { 발주처: string; 낙찰기업: string; lines: string[] }
           > = {};
           items.forEach((i) => {
             const school = i.발주처 || "학교명없음";
-            const kg = getKg(i.수량, i.규격);
-            const line = `${i.식품명} (${kg})`;
-            if (!grouped[school])
-              grouped[school] = { 낙찰기업: i.낙찰기업, lines: [] };
-            grouped[school].lines.push(line);
+            const vendor = i.낙찰기업;
+            const key = `${school}__${vendor}`;
+            const line = `${i.식품명} (${getKg(i.수량, i.규격)})`;
+            if (!grouped[key]) {
+              grouped[key] = {
+                발주처: school,
+                낙찰기업: vendor,
+                lines: [],
+              };
+            }
+            grouped[key].lines.push(line);
           });
 
-          // 낙찰기업 순서대로 정렬: 이가에프엔비(검정) → 에스에이치유통(파랑)
-          const sortedGrouped = Object.entries(grouped).sort(([, a], [, b]) => {
-            const priority = (vendor: string) =>
-              vendor.includes("이가에프엔비") ? 1 :
-              vendor.includes("에스에이치유통") ? 2 : 3;
-            return priority(a.낙찰기업) - priority(b.낙찰기업);
-          });
+          // 정렬: 학교명 → 낙찰기업 순
+          const sortedGrouped = Object.entries(grouped).sort(
+            ([keyA, a], [keyB, b]) => {
+              if (a.발주처 < b.발주처) return -1;
+              if (a.발주처 > b.발주처) return 1;
+              const priority = (v: string) =>
+                v.includes("이가에프엔비") ? 1 : v.includes("에스에이치유통") ? 2 : 3;
+              return priority(a.낙찰기업) - priority(b.낙찰기업);
+            }
+          );
 
-          const content = sortedGrouped.map(([school, obj]) => (
-            <div key={school} className={`mb-1 ${getColorClass(obj.낙찰기업)}`}>
-              <span className="font-semibold">{school}</span>
+          const content = sortedGrouped.map(([key, obj]) => (
+            <div key={key} className={`mb-1 ${getColorClass(obj.낙찰기업)}`}>
+              <span className="font-semibold">{obj.발주처}</span>
               <ul className="pl-2">
                 {obj.lines.map((line, idx) => (
                   <li key={idx}>- {line}</li>
