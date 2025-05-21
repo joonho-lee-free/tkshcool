@@ -70,9 +70,7 @@ export default function Home() {
     fetchData();
   }, [selectedYM]);
 
-  const start = startOfMonth(
-    parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date())
-  );
+  const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
   const allDays = eachDayOfInterval({ start, end }).filter(
     (d) => getDay(d) >= 1 && getDay(d) <= 5
@@ -168,11 +166,11 @@ export default function Home() {
             (i) => filterVendor === "전체" || i.낙찰기업 === filterVendor
           );
 
-          // 학교 + 낙찰기업으로 그룹핑
           const grouped: Record<
             string,
             { 발주처: string; 낙찰기업: string; lines: string[] }
           > = {};
+
           items.forEach((i) => {
             const school = i.발주처 || "학교명없음";
             const vendor = i.낙찰기업;
@@ -188,16 +186,15 @@ export default function Home() {
             grouped[key].lines.push(line);
           });
 
-          // 정렬: 학교명 → 낙찰기업 순
-          const sortedGrouped = Object.entries(grouped).sort(
-            ([keyA, a], [keyB, b]) => {
-              if (a.발주처 < b.발주처) return -1;
-              if (a.발주처 > b.발주처) return 1;
-              const priority = (v: string) =>
-                v.includes("이가에프엔비") ? 1 : v.includes("에스에이치유통") ? 2 : 3;
-              return priority(a.낙찰기업) - priority(b.낙찰기업);
-            }
-          );
+          // 🎯 수정된 정렬: 낙찰기업 우선 → 학교 오름차순
+          const sortedGrouped = Object.entries(grouped).sort(([, a], [, b]) => {
+            const vendorPriority = (v: string) =>
+              v.includes("이가에프엔비") ? 1 : v.includes("에스에이치유통") ? 2 : 3;
+            const pa = vendorPriority(a.낙찰기업);
+            const pb = vendorPriority(b.낙찰기업);
+            if (pa !== pb) return pa - pb;
+            return a.발주처.localeCompare(b.발주처);
+          });
 
           const content = sortedGrouped.map(([key, obj]) => (
             <div key={key} className={`mb-1 ${getColorClass(obj.낙찰기업)}`}>
