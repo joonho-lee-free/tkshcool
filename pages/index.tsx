@@ -77,6 +77,26 @@ export default function Home() {
   );
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
 
+  const handleExcelDownload = () => {
+    const rows = [];
+    Object.entries(calendarData).forEach(([date, items]) => {
+      items.forEach((i) => {
+        if (filterVendor !== "전체" && i.낙찰기업 !== filterVendor) return;
+        rows.push({
+          날짜: date,
+          낙찰기업: i.낙찰기업,
+          발주처: i.발주처,
+          품목: i.식품명,
+          수량: i.수량,
+        });
+      });
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "발주현황");
+    XLSX.writeFile(wb, `${selectedYM}_발주현황.xlsx`);
+  };
+
   const handleClickSchool = async (school, vendor, date) => {
     const ym = selectedYM.replace("-", "").slice(2);
     const docId = `${ym}_${school}`;
