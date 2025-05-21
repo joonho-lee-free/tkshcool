@@ -115,7 +115,7 @@ export default function Home() {
     const schoolData = schoolSnap.data();
     const vendorData = vendorSnap.data();
     const matchedItems = (schoolData.품목 || []).filter((item: any) =>
-      item.납품?.[date]
+       Object.keys(item.납품 || {}).includes(date)
     );
 
     const lineItems = matchedItems.map((item: any) => ({
