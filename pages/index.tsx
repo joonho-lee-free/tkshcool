@@ -97,7 +97,7 @@ export default function Home() {
   };
 
   const handleClickSchool = async (school: string, vendor: string, date: string) => {
-    const ym = selectedYM.replace("-", "");
+    const ym = selectedYM.replace("-", "").slice(2);
     const docId = `${ym}_${school}`;
     const schoolRef = doc(db, "school", docId);
     const vendorRef = doc(db, "school", vendor);
