@@ -10,6 +10,7 @@ export const generateTransactionExcel = async ({
   발주처: any;
   낙찰기업: any;
   품목들: {
+    번호: number;
     품명: string;
     규격: string;
     수량: number;
@@ -27,7 +28,7 @@ export const generateTransactionExcel = async ({
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
 
-  // 기본 정보 채우기
+  // 수신자/공급자 정보 채우기
   ws["C5"].v = 발주처.발주처 || "";
   ws["C6"].v = 발주처.사업장주소 || "";
   ws["C7"].v = 발주처.대표전화번호 || "";
@@ -36,12 +37,13 @@ export const generateTransactionExcel = async ({
   ws["F5"].v = 낙찰기업.대표자 || "";
   ws["F6"].v = 낙찰기업.대표전화 || 낙찰기업.대표전화번호 || "";
 
+  // 품목 채우기
   let 합계 = 0;
   품목들.forEach((item, i) => {
     const r = 12 + i;
-    ws[`A${r}`] = { v: "25" };
-    ws[`B${r}`] = { v: date.split("-")[1] };
-    ws[`C${r}`] = { v: date.split("-")[2] };
+    ws[`A${r}`] = { v: item.번호 };          // 번호
+    ws[`B${r}`] = { v: date.split("-")[1] }; // 월
+    ws[`C${r}`] = { v: date.split("-")[2] }; // 일
     ws[`D${r}`] = { v: item.품명 };
     ws[`E${r}`] = { v: item.규격 };
     ws[`F${r}`] = { v: item.수량 };
@@ -52,10 +54,6 @@ export const generateTransactionExcel = async ({
 
   ws["F4"].v = 합계;
 
-  // 다운로드 + 인쇄
   const filename = `${발주처.발주처}_${date}_거래명세표.xlsx`;
   XLSX.writeFile(wb, filename);
-
-  // 인쇄용 브라우저 열기: 생략 가능
-  // window.open(`/generated/${filename}`); // or convert to PDF and preview
 };
