@@ -65,7 +65,7 @@ export default function Home() {
       });
 
       setCalendarData(temp);
-      setVendors(["전체", ...Array.from(vendorSet)]);
+      setVendors(["전체", ...Array.from(vendorSet) as string[]]);
     };
     fetchData();
   }, [selectedYM]);
