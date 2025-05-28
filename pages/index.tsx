@@ -17,13 +17,6 @@ const getKg = (수량: number, 규격: string) => {
   return `${(수량 * unit).toFixed(1)}kg`;
 };
 
-// 에스에이치유통 낙찰 시 파랑, 이가에프엔비 낙찰 시 검정, 그 외 회색
-const getColorClass = (vendor: string) => {
-  if (vendor.includes("에스에이치유통")) return "text-blue-600";
-  if (vendor.includes("이가에프엔비")) return "text-black";
-  return "text-gray-700";
-};
-
 export default function Home() {
   const now = new Date();
   const defaultYM = format(now, "yyyy-MM");
@@ -145,6 +138,7 @@ export default function Home() {
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+        {/* 연월 */}
         <select
           value={selectedYM}
           onChange={(e) => setSelectedYM(e.target.value)}
@@ -157,6 +151,7 @@ export default function Home() {
           })}
         </select>
 
+        {/* 벤더 필터 */}
         <select
           value={filterVendor}
           onChange={(e) => setFilterVendor(e.target.value)}
@@ -167,6 +162,7 @@ export default function Home() {
           ))}
         </select>
 
+        {/* 학교 필터 */}
         <select
           value={filterSchool}
           onChange={(e) => setFilterSchool(e.target.value)}
@@ -185,50 +181,4 @@ export default function Home() {
         </button>
       </div>
 
-      <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
-
-      <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
-        {['월', '화', '수', '목', '금'].map((d) => (
-          <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-5 gap-2 text-xs">
-        {leadingEmpty.map((_, i) => <div key={i} />)}
-        {allDays.map((day) => {
-          const dateStr = format(day, "yyyy-MM-dd");
-          const items = (calendarData[dateStr] || []).filter(
-            (i) => (filterVendor === "전체" || i.낙찰기업 === filterVendor)
-                   && (filterSchool === "전체" || i.발주처 === filterSchool)
-          );
-          const grouped: Record<string, any> = {};
-          items.forEach((i) => {
-            const key = i.발주처;
-            if (!grouped[key]) grouped[key] = { 발주처: i.발주처, 낙찰기업: i.낙찰기업, lines: [] };
-            grouped[key].lines.push(`${i.식품명} (${getKg(i.수량, i.규격)})`);
-          });
-          const sorted = Object.values(grouped).sort((a: any, b: any) => a.발주처.localeCompare(b.발주처));
-          return (
-            <div key={dateStr} className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-hidden">
-              <div className="font-bold mb-1">{format(day, "d")}</div>
-              {sorted.map((obj: any, idx: number) => (
-                <div
-                  key={idx}
-                  className={`mb-1 ${getColorClass(obj.낙찰기업)} cursor-pointer`}
-                  onClick={() => handleClickSchool(obj.발주처, obj.낙찰기업, dateStr)}
-                >
-                  <span className="font-semibold underline">{obj.발주처}</span>
-                  <ul className="pl-2">
-                    {obj.lines.map((line: string, li: number) => (
-                      <li key={li}>- {line}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+      <h2 className="text-2xl font-bold mb-3 text
