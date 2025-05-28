@@ -62,16 +62,15 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       const snapshot = await getDocs(collection(db, "school"));
-      // 선택한 달의 prefix (예: "2506")
-      const prefix = selectedYM.replace("-", '').slice(2);
-      const filtered = snapshot.docs.filter(doc => doc.id.startsWith(prefix));
+      const prefix = selectedYM.replace("-", "").slice(2);
+      const filteredDocs = snapshot.docs.filter(doc => doc.id.startsWith(prefix));
 
       const temp: Record<string, any[]> = {};
       const vendorSet = new Set<string>();
       const schoolSet = new Set<string>();
       const itemSet = new Set<string>();
 
-      filtered.forEach(doc => {
+      filteredDocs.forEach(doc => {
         const data = doc.data();
         const 발주처 = data.발주처 || "학교명없음";
         const 낙찰기업 = data.낙찰기업 || "업체미지정";
@@ -82,7 +81,7 @@ export default function Home() {
           itemSet.add(item.식품명);
           Object.entries(item.납품 || {}).forEach(
             ([date, delivery]: [string, any]) => {
-              if (!temp[date]) temp[date] = [];
+              temp[date] = temp[date] || [];
               temp[date].push({
                 발주처,
                 낙찰기업,
@@ -96,10 +95,18 @@ export default function Home() {
         });
       });
 
+      // 낙찰기업 별 정렬: 우선순위에 없는 업체는 이름순
+      const sortedVendors = [...vendorSet].sort((a, b) => {
+        const ia = vendorPriority.indexOf(a);
+        const ib = vendorPriority.indexOf(b);
+        if (ia !== -1 || ib !== -1) return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+        return a.localeCompare(b);
+      });
+
       setCalendarData(temp);
-      setVendors(["전체", ...Array.from(vendorSet)]);
-      setSchools(["전체", ...Array.from(schoolSet)]);
-      setItems(["전체", ...Array.from(itemSet)]);
+      setVendors(["전체", ...sortedVendors]);
+      setSchools(["전체", ...Array.from(schoolSet).sort()]);
+      setItems(["전체", ...Array.from(itemSet).sort()]);
     };
     fetchData();
   }, [selectedYM]);
@@ -107,7 +114,9 @@ export default function Home() {
   // 달력 날짜 계산 (월~금)
   const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
-  const allDays = eachDayOfInterval({ start, end }).filter(d => getDay(d) >= 1 && getDay(d) <= 5);
+  const allDays = eachDayOfInterval({ start, end }).filter(
+    d => [1,2,3,4,5].includes(getDay(d))
+  );
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
 
   // 엑셀 다운로드
@@ -135,9 +144,7 @@ export default function Home() {
           {months.map(ym => <option key={ym} value={ym}>{ym}</option>)}
         </select>
         <select value={filterVendor} onChange={e => setFilterVendor(e.target.value)} className="border p-2 rounded">
-          {vendors.map(v => (
-            <option key={v} value={v} style={{ color: getVendorColor(v) }}>{v}</option>
-          ))}
+          {vendors.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
         <select value={filterSchool} onChange={e => setFilterSchool(e.target.value)} className="border p-2 rounded">
           {schools.map(s => <option key={s} value={s}>{s}</option>)}
