@@ -17,11 +17,19 @@ const getKg = (수량: number, 규격: string) => {
   return `${(수량 * unit).toFixed(1)}kg`;
 };
 
-const getColorClass = (vendor: string) => {
-  // 공백 제거하고 소문자로 통일
+// 실제 CSS 컬러 값을 반환하는 유틸
+const getVendorColor = (vendor: string) => {
   const norm = (vendor || "").replace(/\s+/g, "").toLowerCase();
-  if (norm.includes("에스에이치유통")) return "text-blue-600";
-  if (norm.includes("이가에프엔비")) return "text-black";
+  if (norm.includes("에스에이치유통") || norm.includes("에스에이치")) return "blue";
+  if (norm.includes("이가에프엔비")) return "black";
+  return "gray";
+};
+
+// Tailwind 클래스 반환 (캘린더 내 항목용)
+const getColorClass = (vendor: string) => {
+  const c = getVendorColor(vendor);
+  if (c === "blue") return "text-blue-600";
+  if (c === "black") return "text-black";
   return "text-gray-700";
 };
 
@@ -91,7 +99,9 @@ export default function Home() {
     fetchData();
   }, [selectedYM]);
 
-  const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
+  const start = startOfMonth(
+    parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date())
+  );
   const end = endOfMonth(start);
   const allDays = eachDayOfInterval({ start, end }).filter(
     (d) => getDay(d) >= 1 && getDay(d) <= 5
@@ -139,7 +149,13 @@ export default function Home() {
           className="border p-2 rounded"
         >
           {vendors.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option
+              key={v}
+              value={v}
+              style={{ color: getVendorColor(v) }}
+            >
+              {v}
+            </option>
           ))}
         </select>
         <select
@@ -171,9 +187,7 @@ export default function Home() {
       <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
 
       <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
-        {[
-          "월","화","수","목","금"
-        ].map((day) => (
+        {["월","화","수","목","금"].map((day) => (
           <div key={day} className="bg-gray-100 py-1 rounded">{day}</div>
         ))}
       </div>
@@ -207,17 +221,4 @@ export default function Home() {
             <div key={dateStr} className="border p-2 min-h-[10rem] shadow-sm overflow-hidden">
               <div className="font-bold mb-1">{format(day, 'd')}</div>
               {Object.values(grouped).map((g, idx) => (
-                <div key={idx} className={`${getColorClass(g.낙찰기업)} mb-1`}>
-                  <div className="font-semibold underline">{g.발주처}</div>
-                  <ul className="pl-2">
-                    {g.lines.map((l, i) => <li key={i}>- {l}</li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+                <div key={idx} className={`${getColorClass(g.낙찰기업)} mb-1`}>...
