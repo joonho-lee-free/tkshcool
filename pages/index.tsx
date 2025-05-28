@@ -3,11 +3,11 @@ import { db } from "../lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import {
   format,
+  parse,
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
   getDay,
-  parse,
 } from "date-fns";
 import * as XLSX from "xlsx";
 
@@ -26,7 +26,14 @@ const getColorClass = (vendor: string) => {
 export default function Home() {
   const now = new Date();
   const defaultYM = format(now, "yyyy-MM");
-  const [selectedYM, setSelectedYM] = useState(defaultYM);
+  const months = Array.from({ length: 9 }, (_, i) => {
+    const m = 4 + i;
+    return `2025-${String(m).padStart(2, "0")}`;
+  });
+
+  const [selectedYM, setSelectedYM] = useState<string>(
+    months.includes(defaultYM) ? defaultYM : months[0]
+  );
   const [calendarData, setCalendarData] = useState<Record<string, any[]>>({});
   const [filterVendor, setFilterVendor] = useState("전체");
   const [filterSchool, setFilterSchool] = useState("전체");
@@ -34,6 +41,8 @@ export default function Home() {
   const [vendors, setVendors] = useState<string[]>(["전체"]);
   const [schools, setSchools] = useState<string[]>(["전체"]);
   const [items, setItems] = useState<string[]>(["전체"]);
+  
+  const vendorPriority = ["이가에프엔비", "에스에이치유통"];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,7 +74,6 @@ export default function Home() {
               낙찰기업,
               수량: delivery.수량,
               단가: item.단가,
-              날짜: date,
             });
           });
         });
@@ -110,60 +118,44 @@ export default function Home() {
 
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
+      {/* 필터 */}
       <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
         <select
           value={selectedYM}
           onChange={(e) => setSelectedYM(e.target.value)}
           className="border p-2 rounded"
         >
-          {Array.from({ length: 6 }).map((_, idx) => {
-            const date = new Date();
-            date.setMonth(date.getMonth() - idx);
-            const ym = format(date, "yyyy-MM");
-            return (
-              <option key={ym} value={ym}>
-                {ym}
-              </option>
-            );
-          })}
+          {months.map((ym) => (
+            <option key={ym} value={ym}>{ym}</option>
+          ))}
         </select>
-
         <select
           value={filterVendor}
           onChange={(e) => setFilterVendor(e.target.value)}
           className="border p-2 rounded"
         >
           {vendors.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
+            <option key={v} value={v}>{v}</option>
           ))}
         </select>
-
         <select
           value={filterSchool}
           onChange={(e) => setFilterSchool(e.target.value)}
           className="border p-2 rounded"
         >
           {schools.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
+            <option key={s} value={s}>{s}</option>
           ))}
         </select>
-
         <select
           value={filterItem}
           onChange={(e) => setFilterItem(e.target.value)}
           className="border p-2 rounded"
         >
           {items.map((it) => (
-            <option key={it} value={it}>
-              {it}
-            </option>
+            <option key={it} value={it}>{it}</option>
           ))}
         </select>
-
         <button
           onClick={handleExcelDownload}
           className="bg-blue-500 text-white px-4 py-2 rounded shadow"
@@ -175,28 +167,29 @@ export default function Home() {
       <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
 
       <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
-        {["월", "화", "수", "목", "금"].map((day) => (
-          <div key={day} className="bg-gray-100 py-1 rounded">
-            {day}
-          </div>
+        {["월","화","수","목","금"].map((day) => (
+          <div key={day} className="bg-gray-100 py-1 rounded">{day}</div>
         ))}
       </div>
 
       <div className="grid grid-cols-5 gap-2 text-xs">
-        {leadingEmpty.map((_, i) => (
-          <div key={i}></div>
-        ))}
+        {leadingEmpty.map((_, i) => (<div key={i} />))}
         {allDays.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const list = calendarData[dateStr] || [];
-          const filtered = list.filter(
-            (i) =>
+          const filtered = list
+            .filter((i) =>
               (filterVendor === "전체" || i.낙찰기업 === filterVendor) &&
               (filterSchool === "전체" || i.발주처 === filterSchool) &&
               (filterItem === "전체" || i.식품명 === filterItem)
-          );
+            )
+            .sort((a, b) => {
+              const pa = vendorPriority.indexOf(a.낙찰기업);
+              const pb = vendorPriority.indexOf(b.낙찰기업);
+              return (pa === -1 ? Infinity : pa) - (pb === -1 ? Infinity : pb);
+            });
 
-          const grouped: Record<string, any> = {};
+          const grouped: Record<string, { 발주처: string; 낙찰기업: string; lines: string[] }> = {};
           filtered.forEach((i) => {
             const key = `${i.발주처}__${i.낙찰기업}`;
             const line = `${i.식품명} (${getKg(i.수량, i.규격)})`;
@@ -205,23 +198,13 @@ export default function Home() {
           });
 
           return (
-            <div
-              key={dateStr}
-              className="border p-2 min-h-[10rem] shadow-sm overflow-hidden"
-            >
-              <div className="font-bold mb-1">{format(day, "d")}</div>
+            <div key={dateStr} className="border p-2 min-h-[10rem] shadow-sm overflow-hidden">
+              <div className="font-bold mb-1">{format(day, 'd')}</div>
               {Object.values(grouped).map((g, idx) => (
-                <div
-                  key={idx}
-                  className={`${getColorClass(g.낙찰기업)} mb-1`}
-                >
-                  <div className="font-semibold underline">
-                    {g.발주처}
-                  </div>
+                <div key={idx} className={`${getColorClass(g.낙찰기업)} mb-1`}>
+                  <div className="font-semibold underline">{g.발주처}</div>
                   <ul className="pl-2">
-                    {g.lines.map((l: any, i: number) => (
-                      <li key={i}>- {l}</li>
-                    ))}
+                    {g.lines.map((l, i) => <li key={i}>- {l}</li>)}
                   </ul>
                 </div>
               ))}
