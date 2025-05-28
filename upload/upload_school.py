@@ -5,6 +5,9 @@ from pathlib import Path
 import datetime
 import fitz
 import re
+import os
+
+# PDF 정보 추출
 
 def extract_school_info_from_pdf_text(text: str, pdf_name: str):
     info = {}
@@ -13,24 +16,46 @@ def extract_school_info_from_pdf_text(text: str, pdf_name: str):
 
     def find_pattern(pattern):
         for line in lines:
-            match = re.search(pattern, line)
-            if match:
-                return match.group(1).strip()
+            m = re.search(pattern, line)
+            if m:
+                return m.group(1).strip()
         return ""
 
     def extract_address():
-        text_joined = " ".join(lines)
-        text_joined = re.sub(r"[^\w가-힣0-9\s\-()]", " ", text_joined)
-        match = re.search(r"(부산광역시.*?학교)", text_joined)
-        return match.group(1).strip() if match else ""
+        joined = " ".join(lines)
+        joined = re.sub(r"[^\w가-힣0-9\s\-()]", " ", joined)
+        m = re.search(r"(부산광역시.*?학교)", joined)
+        return m.group(1).strip() if m else ""
 
     info["대표"] = "학교장"
     info["사업자등록번호"] = find_pattern(r"([0-9]{3}-[0-9]{2}-[0-9]{5})")
     info["사업장주소"] = extract_address()
     info["대표전화번호"] = find_pattern(r"(0\d{1,2}-\d{3,4}-\d{4})")
-
-    print(f"✔ PDF 추출 성공: {pdf_name} → {len([v for v in info.values() if v])}개 필드 → {info}")
     return info
+
+
+# 계약단가 매칭 함수
+
+def parse_qty(val):
+    try:
+        if pd.isna(val): return 0.0
+        s = re.sub(r"[^\d.]", "", str(val))
+        return float(s) if s else 0.0
+    except:
+        return 0.0
+
+
+def safe_date(raw, ym):
+    try:
+        r = re.sub(r"[^0-9.]", ".", str(raw))
+        parts = [p for p in r.split('.') if p]
+        if len(parts) >= 2:
+            m, d = parts[:2]
+            return f"{ym[:4]}-{m.zfill(2)}-{d.zfill(2)}"
+        return None
+    except:
+        return None
+
 
 def load_pdf_info_map(pdf_dir: Path):
     info_map = {}
@@ -40,127 +65,118 @@ def load_pdf_info_map(pdf_dir: Path):
             doc = fitz.open(pdf)
             text = "".join(page.get_text() for page in doc)
             info = extract_school_info_from_pdf_text(text, pdf.name)
-            if info:
-                info_map[key] = info
+            print(f"📑 PDF 파싱 완료: {pdf.name} → {info}")
+            info_map[key] = info
         except Exception as e:
-            print(f"❌ PDF 열기 오류: {pdf.name} | {e}")
+            print(f"❌ PDF 파싱 실패: {pdf.name} | {e}")
     return info_map
 
-def is_날짜필드(h):
-    try:
-        return 1 <= float(str(h).strip()) <= 12.31
-    except:
-        return False
 
-def safe_parse_date(raw, 연월):
-    try:
-        if isinstance(raw, (float, int)):
-            m = str(int(raw)).zfill(2)
-            d = str(int(round((raw - int(raw)) * 100))).zfill(2)
-        else:
-            raw = str(raw).replace("월", ".").replace("일", "").replace(" ", "").strip()
-            parts = raw.replace("..", ".").split(".")
-            if len(parts) == 2:
-                m, d = parts
-                m = m.zfill(2)
-                d = d.zfill(2)
-            else:
-                return None
-        return f"{연월[:4]}-{m}-{d}"
-    except:
-        return None
+def main():
+    # Firebase 초기화
+    cred = credentials.Certificate("C:/school/key/firebase-key.json")
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred)
+    db = firestore.client()
 
-cred = credentials.Certificate("C:/school/key/firebase-key.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+    base = Path(__file__).parent
+    excel_dir = base / "excel"
+    pdf_map = load_pdf_info_map(excel_dir)
 
-base_dir = Path("C:/school/upload")
-excel_dir = base_dir / "excel"
-pdf_info_map = load_pdf_info_map(excel_dir)
+    logs, school_logs = [], []
 
-print(f"\n=== 🏁 발주서 + 학교정보 업로드 시작: {datetime.datetime.now()} ===\n")
+    # 업로드용 엑셀 파일 패턴 수정
+    for file in excel_dir.glob("*_업로드용*.xlsx"):
+        try:
+            print(f"📄 처리: {file.name}")
+            parts = file.stem.split("_")
+            ym_raw, school, _, bidder = parts[:4]
+            ym = f"20{ym_raw[:2]}-{ym_raw[2:]}"
+            doc_id = f"{ym_raw}_{school}"
 
-for file_path in excel_dir.glob("*_업로드용.xlsx"):
-    try:
-        print(f"\n📄 엑셀 처리 중: {file_path.name}")
-        parts = file_path.stem.split("_")
-        연월_raw, 발주처, _, 낙찰기업 = parts[:4]
-        연월 = f"20{연월_raw[:2]}-{연월_raw[2:]}"
-        문서ID = f"{연월_raw}_{발주처}"
-        pdf_key = 문서ID
+            df = pd.read_excel(file, header=None)
+            hi = df[df.iloc[:,0].astype(str).str.contains("NO", na=False)].index[0]
+            header = df.iloc[hi].tolist()
+            data = df.iloc[hi+1:].copy()
+            data.columns = header
 
-        df = pd.read_excel(file_path, header=None)
-        header_idx = df[df.iloc[:, 0].astype(str).str.contains("NO", na=False)].index[0]
-        header = df.iloc[header_idx].tolist()
-        data = df.iloc[header_idx + 1:].copy()
-        data.columns = header
+            # 식품명 및 날짜열 추출
+            name_col = next(c for c in data.columns if "식품명" in str(c) or "품명" in str(c))
+            date_idxs, date_names = [], []
+            for i, h in enumerate(header):
+                if i < 6 or pd.isnull(h): continue
+                s = str(h)
+                if any(x in s for x in ["합계","총량","총액"]): continue
+                date_idxs.append(i); date_names.append(h)
 
-        식품명열 = [c for c in data.columns if "식품명" in str(c)][0]
-        날짜_idx = [i for i, h in enumerate(header) if is_날짜필드(h)]
-        날짜_이름 = [header[i] for i in 날짜_idx]
-
-        품목목록 = []
-        for _, row in data.iterrows():
-            if pd.isnull(row[식품명열]):
-                continue
-            식품명 = str(row[식품명열]).strip()
-            try:
-                raw_price = row.get("계약단가", 0)
-                단가 = float(str(raw_price).replace(",", "").strip())
-                if 단가 < 1000:
-                    단가 *= 1000
-            except:
-                단가 = 0.0
-
-            총수량 = 0.0
-            납품 = {}
-            for i, 날짜 in zip(날짜_idx, 날짜_이름):
+            # 품목 목록 구성
+            items = []
+            for _, row in data.iterrows():
+                if pd.isnull(row.get("NO")): continue
+                name = str(row[name_col]).strip()
+                # 단가 매칭
                 try:
-                    수량 = float(str(row[i]).strip())
-                    if 수량 > 0:
-                        full_date = safe_parse_date(날짜, 연월)
-                        if full_date:
-                            납품[full_date] = {
-                                "수량": 수량,
-                                "단가": 단가,
-                                "금액": round(수량 * 단가)
-                            }
-                            총수량 += 수량
+                    price = float(str(row.get("계약단가",0)).replace(",",""))
+                    if price < 1000: price *= 1000
                 except:
-                    continue
+                    price = 0.0
+                    msg = f"⚠️ 단가 없음: {name} ({file.name})"
+                    print(msg); logs.append(msg); school_logs.append(msg)
 
-            if 납품:
-                품목목록.append({
-                    "no": str(row["NO"]).strip(),
-                    "식품명": 식품명,
-                    "단가": 단가,
-                    "규격": str(row.get("규격/단위", "")).strip(),
-                    "총량": round(총수량, 2),
-                    "속성정보": str(row.get("속성정보", "")).strip(),
-                    "납품": 납품
-                })
+                # 납품 정보 수집
+                deliver, total = {}, 0.0
+                for idx, dn in zip(date_idxs, date_names):
+                    qty = parse_qty(row[idx])
+                    if qty <= 0: continue
+                    dt = safe_date(dn, ym)
+                    if not dt: continue
+                    deliver[dt] = {"수량":qty, "단가":price, "금액":round(qty*price)}
+                    total += qty
 
-        if not 품목목록:
-            print(f"⚠️ 품목 없음 → 스킵됨")
-            continue
+                if deliver:
+                    items.append({
+                        "no": str(row["NO"]).strip(),
+                        "식품명": name,
+                        "규격": str(row.get("규격/단위","")),
+                        "단가": price,
+                        "총량": round(total,2),
+                        "속성정보": str(row.get("속성정보","")),
+                        "납품": deliver
+                    })
 
-        저장데이터 = {
-            "연월": 연월,
-            "발주처": 발주처,
-            "낙찰기업": 낙찰기업,
-            "품목": firestore.ArrayUnion(품목목록)
-        }
+            if not items:
+                msg = f"❌ 아이템 없음: {file.name}"
+                print(msg); logs.append(msg); school_logs.append(msg)
+                continue
 
-        if pdf_key in pdf_info_map:
-            저장데이터.update(pdf_info_map[pdf_key])
+            data_to = {"연월": ym, "발주처": school, "낙찰기업": bidder, "품목": items}
+            if doc_id in pdf_map:
+                data_to.update(pdf_map[doc_id])
+            else:
+                msg = f"⚠️ PDF 없음: {doc_id}"
+                print(msg); logs.append(msg); school_logs.append(msg)
 
-        doc_ref = db.collection("school").document(문서ID)
-        doc_ref.set(저장데이터, merge=True)
+            ref = db.collection("school").document(doc_id)
+            if ref.get().exists:
+                msg = f"✅ ArrayUnion: {doc_id}"
+                print(msg); logs.append(msg); school_logs.append(msg)
+                ref.update({"품목": firestore.ArrayUnion(items)})
+            else:
+                msg = f"🔥 신규 저장: {doc_id}"
+                print(msg); logs.append(msg); school_logs.append(msg)
+                ref.set(data_to)
 
-        print(f"✅ 업로드 완료: {문서ID} ({len(품목목록)}개 품목)")
+        except Exception as e:
+            msg = f"❌ 예외: {file.name} | {e}"
+            print(msg); logs.append(msg); school_logs.append(msg)
 
-    except Exception as e:
-        print(f"❌ 오류: {file_path.name} | {e}")
+    with open(base/"업로드_log.txt","w",encoding="utf-8") as f:
+        f.write("\n".join(logs))
+    with open(base/"학교별_업로드결과.txt","w",encoding="utf-8") as f:
+        f.write("\n".join(school_logs))
 
-print(f"\n🎉 모든 업로드 작업 완료!")
-input("⏎ Enter 키를 눌러 종료합니다.")
+    print("\n🎉 완료. 로그 저장")
+    input("엔터 종료…")
+
+if __name__ == "__main__":
+    main()
