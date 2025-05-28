@@ -32,9 +32,8 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       const snapshot = await getDocs(collection(db, "school"));
-      const filtered = snapshot.docs.filter((doc) =>
-        doc.id.startsWith(selectedYM.replace("-", "").slice(2))
-      );
+      const monthPrefix = selectedYM.replace("-", "").slice(2);
+      const filtered = snapshot.docs.filter((doc) => doc.id.startsWith(monthPrefix));
 
       const temp: Record<string, any[]> = {};
       const vendorSet = new Set<string>();
@@ -52,12 +51,10 @@ export default function Home() {
             if (!temp[date]) temp[date] = [];
             temp[date].push({
               발주처,
+              낙찰기업,
               식품명: item.식품명,
               규격: item.규격,
-              낙찰기업,
               수량: delivery.수량,
-              단가: item.단가,
-              날짜: date,
             });
           });
         });
@@ -72,14 +69,14 @@ export default function Home() {
 
   const handleExcelDownload = () => {
     const rows: any[] = [];
-    Object.entries(calendarData).forEach(([date, items]) => {
+    Object.entries(calendarData).forEach(([날짜, items]) => {
       items.forEach((i) => {
         if (filterVendor !== "전체" && i.낙찰기업 !== filterVendor) return;
         if (filterSchool !== "전체" && i.발주처 !== filterSchool) return;
         rows.push({
-          날짜: date,
-          낙찰기업: i.낙찰기업,
+          날짜,
           발주처: i.발주처,
+          낙찰기업: i.낙찰기업,
           품목: i.식품명,
           수량: i.수량,
         });
@@ -99,46 +96,11 @@ export default function Home() {
   );
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
 
-  const handleClickSchool = async (school: string, vendor: string, date: string) => {
-    const ym = selectedYM.replace("-", "").slice(2);
-    const docId = `${ym}_${school}`;
-    try {
-      const schoolRef = doc(db, "school", docId);
-      const vendorRef = doc(db, "school", vendor);
-      const [schoolSnap, vendorSnap] = await Promise.all([
-        getDoc(schoolRef),
-        getDoc(vendorRef),
-      ]);
-      if (!schoolSnap.exists() || !vendorSnap.exists()) {
-        alert("데이터 없음");
-        return;
-      }
-      const schoolData = schoolSnap.data();
-      const vendorData = vendorSnap.data();
-      const matched = (schoolData.품목 || []).filter((item: any) =>
-        item.납품?.[date]
-      );
-      const sheetData = matched.map((item: any, idx: number) => ({
-        번호: idx + 1,
-        품명: item.식품명,
-        규격: item.규격,
-        수량: item.납품[date].수량,
-        단가: item.단가,
-        공급가액: item.납품[date].수량 * item.단가,
-      }));
-      const ws = XLSX.utils.json_to_sheet(sheetData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-      XLSX.writeFile(wb, `${docId}_${date}.xlsx`);
-    } catch {
-      alert("❗ 오류 발생, 콘솔 확인");
-    }
-  };
-
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
+      {/* 컨트롤 바: 연월, 벤더, 학교, 다운로드 버튼 */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-        {/* 연월 */}
+        {/* 연월 선택 */}
         <select
           value={selectedYM}
           onChange={(e) => setSelectedYM(e.target.value)}
@@ -147,7 +109,11 @@ export default function Home() {
           {Array.from({ length: 12 }, (_, i) => {
             const m = new Date(now.getFullYear(), now.getMonth() - 6 + i);
             const ym = format(m, "yyyy-MM");
-            return <option key={ym} value={ym}>{ym}</option>;
+            return (
+              <option key={ym} value={ym}>
+                {ym}
+              </option>
+            );
           })}
         </select>
 
@@ -158,7 +124,9 @@ export default function Home() {
           className="border p-2 rounded"
         >
           {vendors.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v}>
+              {v}
+            </option>
           ))}
         </select>
 
@@ -169,7 +137,9 @@ export default function Home() {
           className="border p-2 rounded"
         >
           {schools.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
 
@@ -181,4 +151,60 @@ export default function Home() {
         </button>
       </div>
 
-      <h2 className="text-2xl font-bold mb-3 text
+      {/* 달력 제목 */}
+      <h2 className="text-2xl font-bold mb-3 text-center">
+        {selectedYM} 발주 달력
+      </h2>
+
+      {/* 요일 헤더 */}
+      <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
+        {['월', '화', '수', '목', '금'].map((d) => (
+          <div key={d} className="bg-gray-100 py-1 rounded">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* 달력 콘텐츠 */}
+      <div className="grid grid-cols-5 gap-2 text-xs">
+        {leadingEmpty.map((_, i) => (
+          <div key={i} />
+        ))}
+        {allDays.map((day) => {
+          const dateStr = format(day, "yyyy-MM-dd");
+          const items = (calendarData[dateStr] || []).filter(
+            (i) => (filterVendor === "전체" || i.낙찰기업 === filterVendor) &&
+                   (filterSchool === "전체" || i.발주처 === filterSchool)
+          );
+
+          // 발주처별 그룹핑
+          const grouped: Record<string, { 발주처: string; 낙찰기업: string; lines: string[] }> = {};
+          items.forEach((i) => {
+            const key = i.발주처;
+            if (!grouped[key]) grouped[key] = { 발주처: i.발주처, 낙찰기업: i.낙찰기업, lines: [] };
+            grouped[key].lines.push(`${i.식품명} (${getKg(i.수량, i.규격)})`);
+          });
+
+          return (
+            <div
+              key={dateStr}
+              className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-hidden"
+            >
+              <div className="font-bold mb-1">{format(day, "d")}</div>
+              {Object.values(grouped).map((obj, idx) => (
+                <div key={idx} className={`mb-1 ${obj.낙찰기업.includes("에스에이치유통") ? 'text-blue-600' : 'text-gray-700'}`}>                  
+                  <span className="font-semibold underline">{obj.발주처}</span>
+                  <ul className="pl-2 list-disc list-inside">
+                    {obj.lines.map((line, li) => (
+                      <li key={li}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
