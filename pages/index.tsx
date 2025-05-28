@@ -159,7 +159,7 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-5 gap-2 text-xs">
-        {leadingEmpty map((_, i) => <div key={i} />)}
+        {leadingEmpty.map((_, i) => <div key={i} />)}
         {allDays.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const items = (calendarData[dateStr] || []).filter(
