@@ -10,7 +10,6 @@ import {
   parse,
 } from "date-fns";
 import * as XLSX from "xlsx";
-import { generateTransactionExcel } from "../lib/TransactionExcel";
 
 const getKg = (수량: number, 규격: string) => {
   const match = 규격?.match(/(\d+(\.\d+)?)kg/);
@@ -108,7 +107,6 @@ export default function Home() {
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
 
   const handleClickSchool = async (school: string, vendor: string, date: string) => {
-    // 기존 로직 유지
     const ym = selectedYM.replace("-", "").slice(2);
     const docId = `${ym}_${school}`;
     try {
@@ -127,7 +125,18 @@ export default function Home() {
       const matched = (schoolData.품목 || []).filter((item: any) =>
         item.납품?.[date]
       );
-      await generateTransactionExcel({ date, 발주처: schoolData, 낙찰기업: vendorData, 품목들: matched.map((item: any, idx: number) => ({ 번호: idx+1, 품명: item.식품명, 규격: item.규격, 수량: item.납품[date].수량, 단가: item.단가, 공급가액: item.납품[date].수량 * item.단가 })) });
+      const sheetData = matched.map((item: any, idx: number) => ({
+        번호: idx + 1,
+        품명: item.식품명,
+        규격: item.규격,
+        수량: item.납품[date].수량,
+        단가: item.단가,
+        공급가액: item.납품[date].수량 * item.단가,
+      }));
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      XLSX.writeFile(wb, `${docId}_${date}.xlsx`);
     } catch {
       alert("❗ 오류 발생, 콘솔 확인");
     }
