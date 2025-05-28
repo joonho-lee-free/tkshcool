@@ -72,10 +72,10 @@ export default function Home() {
       filteredDocs.forEach((doc) => {
         const data = doc.data();
         const 발주처 = data.발주처 || "학교명없음";
-        const 낙찰기업 = data.낙찰기업 || "업체미지정";
+        let 낙찰기업 = data.낙찰기업 || "업체미지정";
         // '업로드용' 항목 제외
         if (!낙찰기업.includes("업로드용")) {
-          vendorSet.add(낙찰기업);
+          vendorSet.add(낙찰기업.trim());
         }
         schoolSet.add(발주처);
 
@@ -245,9 +245,7 @@ export default function Home() {
                 <div key={idx} className={`${getColorClass(g.낙찰기업)} mb-1`}>
                   <div className="font-semibold">{g.발주처}</div>
                   {g.lines.map((l: string, i2: number) => (
-                    <div key={i2} className="pl-2">
-                      - {l}
-                    </div>
+                    <div key={i2} className="pl-2">- {l}</div>
                   ))}
                 </div>
               ))}
