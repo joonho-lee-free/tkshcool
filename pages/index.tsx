@@ -18,8 +18,10 @@ const getKg = (수량: number, 규격: string) => {
 };
 
 const getColorClass = (vendor: string) => {
-  if (vendor.includes("에스에이치유통")) return "text-blue-600";
-  if (vendor.includes("이가에프엔비")) return "text-black";
+  // 공백 제거하고 소문자로 통일
+  const norm = (vendor || "").replace(/\s+/g, "").toLowerCase();
+  if (norm.includes("에스에이치유통")) return "text-blue-600";
+  if (norm.includes("이가에프엔비")) return "text-black";
   return "text-gray-700";
 };
 
@@ -41,7 +43,7 @@ export default function Home() {
   const [vendors, setVendors] = useState<string[]>(["전체"]);
   const [schools, setSchools] = useState<string[]>(["전체"]);
   const [items, setItems] = useState<string[]>(["전체"]);
-  
+
   const vendorPriority = ["이가에프엔비", "에스에이치유통"];
 
   useEffect(() => {
@@ -65,17 +67,19 @@ export default function Home() {
 
         (data.품목 || []).forEach((item) => {
           itemSet.add(item.식품명);
-          Object.entries(item.납품 || {}).forEach(([date, delivery]: [string, any]) => {
-            if (!temp[date]) temp[date] = [];
-            temp[date].push({
-              발주처,
-              식품명: item.식품명,
-              규격: item.규격,
-              낙찰기업,
-              수량: delivery.수량,
-              단가: item.단가,
-            });
-          });
+          Object.entries(item.납품 || {}).forEach(
+            ([date, delivery]: [string, any]) => {
+              if (!temp[date]) temp[date] = [];
+              temp[date].push({
+                발주처,
+                식품명: item.식품명,
+                규격: item.규격,
+                낙찰기업,
+                수량: delivery.수량,
+                단가: item.단가,
+              });
+            }
+          );
         });
       });
 
@@ -167,7 +171,9 @@ export default function Home() {
       <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
 
       <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
-        {["월","화","수","목","금"].map((day) => (
+        {[
+          "월","화","수","목","금"
+        ].map((day) => (
           <div key={day} className="bg-gray-100 py-1 rounded">{day}</div>
         ))}
       </div>
