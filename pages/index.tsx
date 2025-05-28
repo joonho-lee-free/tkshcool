@@ -106,15 +106,19 @@ export default function Home() {
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+        {/* 연월 선택: 2025-01 ~ 2025-12, 디폴트 현재월 */}
         <select
           value={selectedYM}
           onChange={(e) => setSelectedYM(e.target.value)}
           className="border p-2 rounded"
         >
           {Array.from({ length: 12 }, (_, i) => {
-            const m = new Date(now.getFullYear(), now.getMonth() - 6 + i);
-            const ym = format(m, "yyyy-MM");
-            return <option key={ym} value={ym}>{ym}</option>;
+            const ym = `2025-${String(i + 1).padStart(2, "0")}`;
+            return (
+              <option key={ym} value={ym}>
+                {ym}
+              </option>
+            );
           })}
         </select>
 
@@ -155,7 +159,7 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-5 gap-2 text-xs">
-        {leadingEmpty.map((_, i) => <div key={i} />)}
+        {leadingEmpty map((_, i) => <div key={i} />)}
         {allDays.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const items = (calendarData[dateStr] || []).filter(
@@ -176,12 +180,7 @@ export default function Home() {
                 <div
                   key={idx}
                   className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}
-                  onClick={() => {
-                    const ym = selectedYM.replace("-", "").slice(2);
-                    const docId = `${ym}_${obj.발주처}`;
-                    const date = dateStr;
-                    docId && date && getDoc(doc(db, "school", docId));
-                  }}
+                  onClick={() => {/* 클릭 처리 */}}
                 >
                   <span className="font-semibold underline">{obj.발주처}</span>
                   <ul className="pl-2">
