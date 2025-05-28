@@ -63,14 +63,14 @@ export default function Home() {
     const fetchData = async () => {
       const snapshot = await getDocs(collection(db, "school"));
       const prefix = selectedYM.replace("-", "").slice(2);
-      const filteredDocs = snapshot.docs.filter(doc => doc.id.startsWith(prefix));
+      const filteredDocs = snapshot.docs.filter((doc) => doc.id.startsWith(prefix));
 
       const temp: Record<string, any[]> = {};
       const vendorSet = new Set<string>();
       const schoolSet = new Set<string>();
       const itemSet = new Set<string>();
 
-      filteredDocs.forEach(doc => {
+      filteredDocs.forEach((doc) => {
         const data = doc.data();
         const 발주처 = data.발주처 || "학교명없음";
         const 낙찰기업 = data.낙찰기업 || "업체미지정";
@@ -96,10 +96,11 @@ export default function Home() {
       });
 
       // 낙찰기업 별 정렬: 우선순위에 없는 업체는 이름순
-      const sortedVendors = [...vendorSet].sort((a, b) => {
+      const sortedVendors = Array.from(vendorSet).sort((a, b) => {
         const ia = vendorPriority.indexOf(a);
         const ib = vendorPriority.indexOf(b);
-        if (ia !== -1 || ib !== -1) return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+        if (ia !== -1 || ib !== -1)
+          return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
         return a.localeCompare(b);
       });
 
@@ -114,16 +115,14 @@ export default function Home() {
   // 달력 날짜 계산 (월~금)
   const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
   const end = endOfMonth(start);
-  const allDays = eachDayOfInterval({ start, end }).filter(
-    d => [1,2,3,4,5].includes(getDay(d))
-  );
+  const allDays = eachDayOfInterval({ start, end }).filter((d) => [1, 2, 3, 4, 5].includes(getDay(d)));
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
 
   // 엑셀 다운로드
   const handleExcelDownload = () => {
     const rows: any[] = [];
     Object.entries(calendarData).forEach(([date, items]) => {
-      items.forEach(i => {
+      items.forEach((i) => {
         if (filterVendor !== "전체" && i.낙찰기업 !== filterVendor) return;
         if (filterSchool !== "전체" && i.발주처 !== filterSchool) return;
         if (filterItem !== "전체" && i.식품명 !== filterItem) return;
@@ -140,57 +139,87 @@ export default function Home() {
     <div className="p-4 max-w-screen-xl mx-auto">
       {/* 필터 영역 */}
       <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-        <select value={selectedYM} onChange={e => setSelectedYM(e.target.value)} className="border p-2 rounded">
-          {months.map(ym => <option key={ym} value={ym}>{ym}</option>)}
+        <select value={selectedYM} onChange={(e) => setSelectedYM(e.target.value)} className="border p-2 rounded">
+          {months.map((ym) => (
+            <option key={ym} value={ym}>
+              {ym}
+            </option>
+          ))}
         </select>
-        <select value={filterVendor} onChange={e => setFilterVendor(e.target.value)} className="border p-2 rounded">
-          {vendors.map(v => <option key={v} value={v}>{v}</option>)}
+        <select value={filterVendor} onChange={(e) => setFilterVendor(e.target.value)} className="border p-2 rounded">
+          {vendors.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
         </select>
-        <select value={filterSchool} onChange={e => setFilterSchool(e.target.value)} className="border p-2 rounded">
-          {schools.map(s => <option key={s} value={s}>{s}</option>)}
+        <select value={filterSchool} onChange={(e) => setFilterSchool(e.target.value)} className="border p-2 rounded">
+          {schools.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
         </select>
-        <select value={filterItem} onChange={e => setFilterItem(e.target.value)} className="border p-2 rounded">
-          {items.map(it => <option key={it} value={it}>{it}</option>)}
+        <select value={filterItem} onChange={(e) => setFilterItem(e.target.value)} className="border p-2 rounded">
+          {items.map((it) => (
+            <option key={it} value={it}>
+              {it}
+            </option>
+          ))}
         </select>
-        <button onClick={handleExcelDownload} className="bg-blue-500 text-white px-4 py-2 rounded shadow">Excel 다운로드</button>
+        <button onClick={handleExcelDownload} className="bg-blue-500 text-white px-4 py-2 rounded shadow">
+          Excel 다운로드
+        </button>
       </div>
 
       <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
 
       {/* 요일 헤더 */}
       <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
-        {['월','화','수','목','금'].map(d => <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>)}
+        {['월', '화', '수', '목', '금'].map((d) => (
+          <div key={d} className="bg-gray-100 py-1 rounded">
+            {d}
+          </div>
+        ))}
       </div>
 
       {/* 날짜 칸 */}
       <div className="grid grid-cols-5 gap-2 text-xs">
-        {leadingEmpty.map((_, i) => <div key={i} />)}
-        {allDays.map(day => {
+        {leadingEmpty.map((_, i) => (
+          <div key={i} />
+        ))}
+        {allDays.map((day) => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const list = calendarData[dateStr] || [];
           const filtered = list
-            .filter(i => (filterVendor==='전체'||i.낙찰기업===filterVendor)
-                      &&(filterSchool==='전체'||i.발주처===filterSchool)
-                      &&(filterItem==='전체'||i.식품명===filterItem))
-            .sort((a,b)=>{
-              const pa=vendorPriority.indexOf(a.낙찰기업);
-              const pb=vendorPriority.indexOf(b.낙찰기업);
-              return (pa===-1?Infinity:pa)-(pb===-1?Infinity:pb);
+            .filter(
+              (i) => (filterVendor === '전체' || i.낙찰기업 === filterVendor) &&
+                     (filterSchool === '전체' || i.발주처 === filterSchool) &&
+                     (filterItem === '전체' || i.식품명 === filterItem)
+            )
+            .sort((a, b) => {
+              const pa = vendorPriority.indexOf(a.낙찰기업);
+              const pb = vendorPriority.indexOf(b.낙찰기업);
+              return (pa === -1 ? Infinity : pa) - (pb === -1 ? Infinity : pb);
             });
-          const grouped:Record<string,any> = {};
-          filtered.forEach(i=>{
-            const key=`${i.발주처}__${i.낙찰기업}`;
-            const line=`${i.식품명} (${getKg(i.수량,i.규격)})`;
-            if(!grouped[key])grouped[key]={발주처:i.발주처,낙찰기업:i.낙찰기업,lines:[]};
+          const grouped: Record<string, any> = {};
+          filtered.forEach((i) => {
+            const key = `${i.발주처}__${i.낙찰기업}`;
+            const line = `${i.식품명} (${getKg(i.수량, i.규격)})`;
+            if (!grouped[key]) grouped[key] = { 발주처: i.발주처, 낙찰기업: i.낙찰기업, lines: [] };
             grouped[key].lines.push(line);
           });
           return (
             <div key={dateStr} className="border p-2 min-h-[10rem] shadow-sm overflow-hidden">
-              <div className="font-bold mb-1">{format(day,'d')}</div>
-              {Object.values(grouped).map((g:any,idx:number)=>(
+              <div className="font-bold mb-1">{format(day, 'd')}</div>
+              {Object.values(grouped).map((g: any, idx: number) => (
                 <div key={idx} className={`${getColorClass(g.낙찰기업)} mb-1`}>
                   <div className="font-semibold">{g.발주처}</div>
-                  {g.lines.map((l:string,i2:number)=><div key={i2} className="pl-2">- {l}</div>)}
+                  {g.lines.map((l: string, i2: number) => (
+                    <div key={i2} className="pl-2">
+                      - {l}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
