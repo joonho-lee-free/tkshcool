@@ -242,7 +242,8 @@ export default function Home() {
             >
               <div className="font-bold mb-1">{format(day, 'd')}</div>
               {Object.values(grouped).map((g: any, idx: number) => (
-                <div key={idx} className={`mb-1`} style={{ color: getVendorColor(g.낙찰기업) }}>
+                <div key={idx} className="mb-1">
+  <div className={`font-semibold ${getColorClass(g.낙찰기업)}`}>{g.발주처}</div>
                   <div className="font-semibold">{g.발주처}</div>
                   {g.lines.map((l: string, i2: number) => (
                     <div key={i2} className="pl-2">- {l}</div>
