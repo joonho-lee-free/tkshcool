@@ -35,10 +35,8 @@ const getColorClass = (vendor: string) => {
 };
 
 export default function Home() {
-  // 현재 날짜 기준 기본 월
   const now = new Date();
   const defaultYM = format(now, "yyyy-MM");
-  // 2025-04 ~ 2025-12
   const months = Array.from({ length: 9 }, (_, i) => {
     const m = 4 + i;
     return `2025-${String(m).padStart(2, "0")}`;
@@ -55,15 +53,16 @@ export default function Home() {
   const [schools, setSchools] = useState<string[]>(["전체"]);
   const [items, setItems] = useState<string[]>(["전체"]);
 
-  // 우선순위 배열 (이가에프엔비, 에스에이치유통)
+  // 우선순위 배열
   const vendorPriority = ["이가에프엔비", "에스에이치유통"];
 
-  // Firestore 데이터 가져오기
   useEffect(() => {
     const fetchData = async () => {
       const snapshot = await getDocs(collection(db, "school"));
       const prefix = selectedYM.replace("-", "").slice(2);
-      const filteredDocs = snapshot.docs.filter((doc) => doc.id.startsWith(prefix));
+      const filteredDocs = snapshot.docs.filter((doc) =>
+        doc.id.startsWith(prefix)
+      );
 
       const temp: Record<string, any[]> = {};
       const vendorSet = new Set<string>();
@@ -74,7 +73,10 @@ export default function Home() {
         const data = doc.data();
         const 발주처 = data.발주처 || "학교명없음";
         const 낙찰기업 = data.낙찰기업 || "업체미지정";
-        vendorSet.add(낙찰기업);
+        // '업로드용' 항목 제외
+        if (!낙찰기업.includes("업로드용")) {
+          vendorSet.add(낙찰기업);
+        }
         schoolSet.add(발주처);
 
         (data.품목 || []).forEach((item: any) => {
@@ -95,14 +97,17 @@ export default function Home() {
         });
       });
 
-      // 낙찰기업 별 정렬: 우선순위에 없는 업체는 이름순
-      const sortedVendors = Array.from(vendorSet).sort((a, b) => {
-        const ia = vendorPriority.indexOf(a);
-        const ib = vendorPriority.indexOf(b);
-        if (ia !== -1 || ib !== -1)
-          return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
-        return a.localeCompare(b);
-      });
+      // Set을 Array로 변환하여 정렬
+      const sortedVendors = Array.from(vendorSet)
+        .filter((v) => v)
+        .sort((a, b) => {
+          const ia = vendorPriority.indexOf(a);
+          const ib = vendorPriority.indexOf(b);
+          if (ia !== -1 || ib !== -1) {
+            return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+          }
+          return a.localeCompare(b);
+        });
 
       setCalendarData(temp);
       setVendors(["전체", ...sortedVendors]);
@@ -112,13 +117,15 @@ export default function Home() {
     fetchData();
   }, [selectedYM]);
 
-  // 달력 날짜 계산 (월~금)
-  const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date()));
+  const start = startOfMonth(
+    parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date())
+  );
   const end = endOfMonth(start);
-  const allDays = eachDayOfInterval({ start, end }).filter((d) => [1, 2, 3, 4, 5].includes(getDay(d)));
+  const allDays = eachDayOfInterval({ start, end }).filter((d) =>
+    [1, 2, 3, 4, 5].includes(getDay(d))
+  );
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
 
-  // 엑셀 다운로드
   const handleExcelDownload = () => {
     const rows: any[] = [];
     Object.entries(calendarData).forEach(([date, items]) => {
@@ -137,44 +144,63 @@ export default function Home() {
 
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
-      {/* 필터 영역 */}
       <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-        <select value={selectedYM} onChange={(e) => setSelectedYM(e.target.value)} className="border p-2 rounded">
+        <select
+          value={selectedYM}
+          onChange={(e) => setSelectedYM(e.target.value)}
+          className="border p-2 rounded"
+        >
           {months.map((ym) => (
             <option key={ym} value={ym}>
               {ym}
             </option>
           ))}
         </select>
-        <select value={filterVendor} onChange={(e) => setFilterVendor(e.target.value)} className="border p-2 rounded">
+        <select
+          value={filterVendor}
+          onChange={(e) => setFilterVendor(e.target.value)}
+          className="border p-2 rounded"
+        >
           {vendors.map((v) => (
             <option key={v} value={v}>
               {v}
             </option>
           ))}
         </select>
-        <select value={filterSchool} onChange={(e) => setFilterSchool(e.target.value)} className="border p-2 rounded">
+        <select
+          value={filterSchool}
+          onChange={(e) => setFilterSchool(e.target.value)}
+          className="border p-2 rounded"
+        >
           {schools.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
         </select>
-        <select value={filterItem} onChange={(e) => setFilterItem(e.target.value)} className="border p-2 rounded">
+        <select
+          value={filterItem}
+          onChange={(e) => setFilterItem(e.target.value)}
+          className="border p-2 rounded"
+        >
           {items.map((it) => (
             <option key={it} value={it}>
               {it}
             </option>
           ))}
         </select>
-        <button onClick={handleExcelDownload} className="bg-blue-500 text-white px-4 py-2 rounded shadow">
+        <button
+          onClick={handleExcelDownload}
+          className="bg-blue-500 text-white px-4 py-2 rounded shadow"
+        >
           Excel 다운로드
         </button>
       </div>
 
-      <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
+      <h2 className="text-2xl font-bold mb-3 text-center">
+        {selectedYM} 발주 달력
+      </h2>
 
-      {/* 요일 헤더 */}
       <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
         {['월', '화', '수', '목', '금'].map((d) => (
           <div key={d} className="bg-gray-100 py-1 rounded">
@@ -183,7 +209,6 @@ export default function Home() {
         ))}
       </div>
 
-      {/* 날짜 칸 */}
       <div className="grid grid-cols-5 gap-2 text-xs">
         {leadingEmpty.map((_, i) => (
           <div key={i} />
@@ -193,9 +218,10 @@ export default function Home() {
           const list = calendarData[dateStr] || [];
           const filtered = list
             .filter(
-              (i) => (filterVendor === '전체' || i.낙찰기업 === filterVendor) &&
-                     (filterSchool === '전체' || i.발주처 === filterSchool) &&
-                     (filterItem === '전체' || i.식품명 === filterItem)
+              (i) =>
+                (filterVendor === '전체' || i.낙찰기업 === filterVendor) &&
+                (filterSchool === '전체' || i.발주처 === filterSchool) &&
+                (filterItem === '전체' || i.식품명 === filterItem)
             )
             .sort((a, b) => {
               const pa = vendorPriority.indexOf(a.낙찰기업);
@@ -210,7 +236,10 @@ export default function Home() {
             grouped[key].lines.push(line);
           });
           return (
-            <div key={dateStr} className="border p-2 min-h-[10rem] shadow-sm overflow-hidden">
+            <div
+              key={dateStr}
+              className="border p-2 min-h-[10rem] shadow-sm overflow-hidden"
+            >
               <div className="font-bold mb-1">{format(day, 'd')}</div>
               {Object.values(grouped).map((g: any, idx: number) => (
                 <div key={idx} className={`${getColorClass(g.낙찰기업)} mb-1`}>
