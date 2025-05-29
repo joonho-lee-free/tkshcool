@@ -14,7 +14,7 @@ import {
 // Utility to render kilogram string
 const getKg = (수량: number) => `${수량}kg`;
 
-// Schedule item with full detail for calendar
+// Calendar schedule item
 type ScheduleObj = {
   발주처: string;
   낙찰기업: string;
@@ -24,7 +24,7 @@ type ScheduleObj = {
   단가: number;
 };
 
-// Firestore document data for school
+// Firestore data for school document
 type DocData = {
   발주처: string;
   사업자등록번호: string;
@@ -37,7 +37,7 @@ type DocData = {
   }>;
 };
 
-// Firestore document data for vendor
+// Firestore data for vendor document
 type VendorData = {
   상호명: string;
   대표자: string;
@@ -47,7 +47,7 @@ type VendorData = {
   주소: string;
 };
 
-// 색상 결정
+// Vendor color based on name
 const getColorClass = (vendor: string) =>
   vendor.includes("에스에이치유통") ? "text-blue-600" : "text-gray-700";
 
@@ -56,7 +56,7 @@ export default function Print() {
   const defaultYM = format(now, "yyyy-MM");
   const [selectedYM, setSelectedYM] = useState(defaultYM);
 
-  // dateStr -> calendar items
+  // Calendar data: date -> list of schedule items
   const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
 
   // Modal state
@@ -65,7 +65,7 @@ export default function Print() {
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
-  // Load calendar data when month changes
+  // Load calendar data for selected month
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
     getDocs(collection(db, "school")).then((snap) => {
@@ -94,27 +94,32 @@ export default function Print() {
     });
   }, [selectedYM]);
 
-  // Handle click on calendar cell
+  // Handle click on a school in calendar
   const handleClick = async (school: string, vendor: string, date: string) => {
     setModalDate(date);
     const ymCode = selectedYM.replace("-", "").slice(2);
     // Load school document
-    const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
+    const schoolRef = doc(db, "school", `${ymCode}_${school}`);
+    const schoolSnap = await getDoc(schoolRef);
     if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
     // Load vendor document
-    const vendorSnap = await getDoc(doc(db, "school", vendor));
+    const vendorRef = doc(db, "school", vendor);
+    const vendorSnap = await getDoc(vendorRef);
     if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
     setModalOpen(true);
   };
 
+  // Print command
   const doPrint = () => window.print();
 
-  // Calendar calculation
+  // Calendar days calculation
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", now));
   const end = endOfMonth(start);
-  const allDays = eachDayOfInterval({ start, end }).filter((d) => getDay(d) >= 1 && getDay(d) <= 5);
+  const allDays = eachDayOfInterval({ start, end }).filter(
+    (d) => getDay(d) >= 1 && getDay(d) <= 5
+  );
   const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
 
   return (
@@ -137,10 +142,9 @@ export default function Print() {
           onChange={(e) => setSelectedYM(e.target.value)}
           className="border p-2 rounded"
         >
-          {months.map((m) => {
-            const ym = `${year}-${m}`;
-            return <option key={ym} value={ym}>{ym}</option>;
-          })}
+          {months.map((m) => (
+            <option key={m} value={`${year}-${m}`}>{`${year}-${m}`}</option>
+          ))}
         </select>
       </div>
 
@@ -153,7 +157,7 @@ export default function Print() {
           ))}
         </div>
         <div className="grid grid-cols-5 gap-2 text-xs">
-          {leadingEmpty.map((_, i) => <div key={i} />)}
+          {leadingEmpty.map((_, idx) => <div key={idx} />)}
           {allDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
             const items = calendarData[dateStr] || [];
@@ -164,88 +168,105 @@ export default function Print() {
               grouped[it.발주처].lines.push(it);
             });
             return (
-              <div key={dateStr} className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto">
+              <div
+                key={dateStr}
+                className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto"
+              >
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
-                {Object.entries(grouped).map(([school, obj], idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleClick(school, obj.낙찰기업, dateStr)}
-                    className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}
-                  >
-                    <span className="font-semibold underline">{school}</span>
-                    <ul className="pl-2 list-disc list-inside">
-                      {obj.lines.map((line, li) => (
-                        <li key={li}>{`${line.품목} (${getKg(line.수량)})`}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                {Object.entries(grouped).map(([school, obj], i) => {
+                  // Deduplicate 품목
+                  const uniqueList = Array.from(
+                    new Set(obj.lines.map((l) => `${l.품목} (${getKg(l.수량)})`))
+                  );
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => handleClick(school, obj.낙찰기업, dateStr)}
+                      className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}
+                    >
+                      <span className="font-semibold underline">{school}</span>
+                      <ul className="pl-2 list-disc list-inside">
+                        {uniqueList.map((text, idx) => (
+                          <li key={idx}>{text}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Modal for invoice */}
+      {/* Modal Overlay for invoice */}
       {modalOpen && modalDoc && modalVendorDoc && (
-        <div className="p-4 page-break max-w-screen-md mx-auto">
-          <h2 className="text-center text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
-          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-            <div>
-              <strong>공급받는자:</strong> {modalDoc.발주처}
-              <p>사업자등록번호: {modalDoc.사업자등록번호}</p>
-              <p>주소: {modalDoc.사업장주소}</p>
-              <p>대표전화: {modalDoc.대표전화번호}</p>
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-black"
+              onClick={() => setModalOpen(false)}
+            >닫기</button>
+            <h2 className="text-center text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
+            <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+              <div>
+                <strong>공급받는자:</strong> {modalDoc.발주처}
+                <p>사업자등록번호: {modalDoc.사업자등록번호}</p>
+                <p>주소: {modalDoc.사업장주소}</p>
+                <p>대표전화: {modalDoc.대표전화번호}</p>
+              </div>
+              <div>
+                <strong>공급하는자:</strong> {modalVendorDoc.상호명}
+                <p>대표자: {modalVendorDoc.대표자}</p>
+                <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
+                <p>대표전화: {modalVendorDoc.대표전화번호}</p>
+                <p>주소: {modalVendorDoc.주소}</p>
+              </div>
             </div>
-            <div>
-              <strong>공급하는자:</strong> {modalVendorDoc.상호명}
-              <p>대표자: {modalVendorDoc.대표자}</p>
-              <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
-              <p>대표전화: {modalVendorDoc.대표전화번호}</p>
-              <p>주소: {modalVendorDoc.주소}</p>
-            </div>
-          </div>
-          <table className="w-full border-collapse text-sm mb-4">
-            <thead>
-              <tr>
-                <th className="border px-2 py-1">품목</th>
-                <th className="border px-2 py-1">수량</th>
-                <th className="border px-2 py-1">단가</th>
-                <th className="border px-2 py-1">공급가액</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const items = modalDoc.품목.filter(it => it.납품[modalDate]);
-                const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
-                unique.forEach((it) => {
-                  const d = it.납품[modalDate];
-                  (d as any).금액 = d.수량 * d.단가;
-                });
-                return unique.map((it, i) => {
-                  const d = it.납품[modalDate];
-                  return (
-                    <tr key={i}>
-                      <td className="border px-2 py-1">{it.식품명}</td>
-                      <td className="border px-2 py-1 text-right">{d.수량}</td>
-                      <td className="border px-2 py-1 text-right">{d.단가}</td>
-                      <td className="border px-2 py-1 text-right">{(d as any).금액}</td>
-                    </tr>
+            <table className="w-full border-collapse text-sm mb-4">
+              <thead>
+                <tr>
+                  <th className="border px-2 py-1">품목</th>
+                  <th className="border px-2 py-1">수량</th>
+                  <th className="border px-2 py-1">단가</th>
+                  <th className="border px-2 py-1">공급가액</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const items = modalDoc.품목.filter((it) => it.납품[modalDate]);
+                  const unique = Array.from(
+                    new Map(items.map((it) => [it.식품명, it])).values()
                   );
-                });
-              })()}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td className="border px-2 py-1 text-right font-bold" colSpan={3}>합계</td>
-                <td className="border px-2 py-1 text-right font-bold">
-                  {modalDoc.품목.filter(it => it.납품[modalDate]).reduce((sum, it) => sum + it.납품[modalDate].수량 * it.납품[modalDate].단가, 0)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-          <div className="flex justify-center no-print">
-            <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">인쇄하기</button>
+                  return unique.map((it, idx) => {
+                    const d = it.납품[modalDate];
+                    const amount = d.수량 * d.단가;
+                    return (
+                      <tr key={idx}>
+                        <td className="border px-2 py-1">{it.식품명}</td>
+                        <td className="border px-2 py-1 text-right">{d.수량}</td>
+                        <td className="border px-2 py-1 text-right">{d.단가}</td>
+                        <td className="border px-2 py-1 text-right">{amount}</td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="border px-2 py-1 text-right font-bold" colSpan={3}>합계</td>
+                  <td className="border px-2 py-1 text-right font-bold">
+                    {modalDoc.품목
+                      .filter((it) => it.납품[modalDate])
+                      .reduce((sum, it) => sum + it.납품[modalDate].수량 * it.납품[modalDate].단가, 0)
+                    }
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            <div className="flex justify-center no-print">
+              <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">인쇄하기</button>
+            </div>
           </div>
         </div>
       )}
