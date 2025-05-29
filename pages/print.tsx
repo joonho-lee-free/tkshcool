@@ -125,7 +125,7 @@ export default function Print() {
             Excel/PDF 프린트
           </button>
         </div>
-        <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} �발주 달력</h2>
+        <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
         <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
           {['월','화','수','목','금'].map((d) => <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>)}
         </div>
@@ -184,7 +184,11 @@ export default function Print() {
                 </tr>
               </thead>
               <tbody>
-                {modalDoc.품목.filter((item: any) => item.납품 && item.납품[modalDate]).map((item: any, i: number) => {
+                {Array.from(new Map(
+                  modalDoc.품목
+                    .filter((item: any) => item.납품 && item.납품[modalDate])
+                    .map((item: any) => [item.식품명, item])
+                ).values()).map((item: any, i: number) => {
                   const qty = item.납품[modalDate].수량;
                   const price = item.단가;
                   return (
