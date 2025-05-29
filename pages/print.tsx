@@ -10,6 +10,8 @@ import {
   parse,
 } from "date-fns";
 
+const getKg = (수량: number, _규격: string) => 수량 + "kg";
+
 // 달력 스케줄 항목 타입에 단가 포함
 type ScheduleObj = {
   발주처: string;
