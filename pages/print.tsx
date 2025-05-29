@@ -14,7 +14,7 @@ import {
 // Utility to render kilogram string
 const getKg = (수량: number) => `${수량}kg`;
 
-// Schedule item with full detail
+// Schedule item with full detail for calendar
 type ScheduleObj = {
   발주처: string;
   낙찰기업: string;
@@ -24,6 +24,7 @@ type ScheduleObj = {
   단가: number;
 };
 
+// Firestore document data for school
 type DocData = {
   발주처: string;
   사업자등록번호: string;
@@ -32,10 +33,11 @@ type DocData = {
   낙찰기업: string;
   품목: Array<{
     식품명: string;
-    납품: Record<string, { 수량: number; 단가: number }>;  // 월별 납품량 및 가격
+    납품: Record<string, { 수량: number; 단가: number }>;
   }>;
 };
 
+// Firestore document data for vendor
 type VendorData = {
   상호명: string;
   대표자: string;
@@ -54,7 +56,7 @@ export default function Print() {
   const defaultYM = format(now, "yyyy-MM");
   const [selectedYM, setSelectedYM] = useState(defaultYM);
 
-  // dateStr -> list of detailed schedule items
+  // dateStr -> calendar items
   const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
 
   // Modal state
@@ -63,7 +65,7 @@ export default function Print() {
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
-  // Load all schedule data for selected month
+  // Load calendar data when month changes
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
     getDocs(collection(db, "school")).then((snap) => {
@@ -92,14 +94,14 @@ export default function Print() {
     });
   }, [selectedYM]);
 
-  // Click on school cell
+  // Handle click on calendar cell
   const handleClick = async (school: string, vendor: string, date: string) => {
     setModalDate(date);
     const ymCode = selectedYM.replace("-", "").slice(2);
-    // Load school doc
+    // Load school document
     const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
     if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
-    // Load vendor doc
+    // Load vendor document
     const vendorSnap = await getDoc(doc(db, "school", vendor));
     if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
     setModalOpen(true);
@@ -107,7 +109,7 @@ export default function Print() {
 
   const doPrint = () => window.print();
 
-  // Calendar calculations
+  // Calendar calculation
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", now));
@@ -130,7 +132,11 @@ export default function Print() {
 
       {/* Month selector */}
       <div className="no-print p-4 max-w-screen-xl mx-auto">
-        <select value={selectedYM} onChange={(e) => setSelectedYM(e.target.value)} className="border p-2 rounded">
+        <select
+          value={selectedYM}
+          onChange={(e) => setSelectedYM(e.target.value)}
+          className="border p-2 rounded"
+        >
           {months.map((m) => {
             const ym = `${year}-${m}`;
             return <option key={ym} value={ym}>{ym}</option>;
@@ -161,7 +167,11 @@ export default function Print() {
               <div key={dateStr} className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
                 {Object.entries(grouped).map(([school, obj], idx) => (
-                  <div key={idx} onClick={() => handleClick(school, obj.낙찰기업, dateStr)} className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}> 
+                  <div
+                    key={idx}
+                    onClick={() => handleClick(school, obj.낙찰기업, dateStr)}
+                    className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}
+                  >
                     <span className="font-semibold underline">{school}</span>
                     <ul className="pl-2 list-disc list-inside">
                       {obj.lines.map((line, li) => (
@@ -207,19 +217,19 @@ export default function Print() {
             <tbody>
               {(() => {
                 const items = modalDoc.품목.filter(it => it.납품[modalDate]);
-                const unique = Array.from(new Map(items.map(it => [it.품목, it])).values());
+                const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
                 unique.forEach((it) => {
                   const d = it.납품[modalDate];
-                  d.금액 = d.수량 * d.단가;
+                  (d as any).금액 = d.수량 * d.단가;
                 });
                 return unique.map((it, i) => {
                   const d = it.납품[modalDate];
                   return (
                     <tr key={i}>
-                      <td className="border px-2 py-1">{it.품목}</td>
+                      <td className="border px-2 py-1">{it.식품명}</td>
                       <td className="border px-2 py-1 text-right">{d.수량}</td>
                       <td className="border px-2 py-1 text-right">{d.단가}</td>
-                      <td className="border px-2 py-1 text-right">{d.금액}</td>
+                      <td className="border px-2 py-1 text-right">{(d as any).금액}</td>
                     </tr>
                   );
                 });
@@ -235,9 +245,7 @@ export default function Print() {
             </tfoot>
           </table>
           <div className="flex justify-center no-print">
-            <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">
-              인쇄하기
-            </button>
+            <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">인쇄하기</button>
           </div>
         </div>
       )}
