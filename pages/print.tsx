@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Head from "next/head";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import {
@@ -10,15 +11,27 @@ import {
   parse,
 } from "date-fns";
 
-const getKg = (수량: number, _규격: string) => `${수량}kg`;
-
 type ScheduleObj = {
-  발주처: string;
-  낙찰기업: string;
-  날짜: string;
   품목: string;
-  수량: number;
-  단가: number;
+  납품: Record<string, { 수량: number; 단가: number; 금액: number }>;
+};
+
+type DocData = {
+  발주처: string;
+  사업자등록번호: string;
+  사업장주소: string;
+  대표전화번호: string;
+  낙찰기업: string;
+  품목: ScheduleObj[];
+};
+
+type VendorData = {
+  상호명: string;
+  대표자: string;
+  대표전화번호: string;
+  사업자번호?: string;
+  사업자등록번호?: string;
+  주소: string;
 };
 
 const getColorClass = (vendor: string) =>
@@ -29,74 +42,49 @@ export default function Print() {
   const defaultYM = format(now, "yyyy-MM");
   const [selectedYM, setSelectedYM] = useState(defaultYM);
 
-  const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
-  const [filterVendor, setFilterVendor] = useState("전체");
-  const [vendors, setVendors] = useState<string[]>(["전체"]);
-  const [filterSchool, setFilterSchool] = useState("전체");
-  const [schools, setSchools] = useState<string[]>(["전체"]);
+  const [calendarData, setCalendarData] = useState<Record<string, { 발주처: string; 낙찰기업: string }[]>>({});
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalDoc, setModalDoc] = useState<any>(null);
-  const [modalDate, setModalDate] = useState<string>("");
-  const [modalSchool, setModalSchool] = useState<string>("");
-  const [modalVendor, setModalVendor] = useState<string>("");
+  const [modalDoc, setModalDoc] = useState<DocData | null>(null);
+  const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
+  const [modalDate, setModalDate] = useState("");
 
   useEffect(() => {
-    const fetchData = async () => {
-      const snap = await getDocs(collection(db, "school"));
-      const temp: Record<string, ScheduleObj[]> = {};
-      const vset = new Set<string>();
-      const sset = new Set<string>();
-
+    getDocs(collection(db, "school")).then((snap) => {
+      const temp: Record<string, { 발주처: string; 낙찰기업: string }[]> = {};
       snap.docs.forEach((docSnap) => {
         const id = docSnap.id;
         if (!id.startsWith(selectedYM.replace("-", "").slice(2))) return;
-        const data = docSnap.data();
-        const schoolName = data.발주처;
-        const vendorName = data.낙찰기업;
-        vset.add(vendorName);
-        sset.add(schoolName);
+        const data = docSnap.data() as any;
+        const school = data.발주처;
+        const vendor = data.낙찰기업 || data.납찰기업;
         (data.품목 || []).forEach((item: any) => {
           Object.entries(item.납품 || {}).forEach(([date, del]: [string, any]) => {
-            if (!temp[date]) temp[date] = [];
-            temp[date].push({
-              발주처: schoolName,
-              낙찰기업: vendorName,
-              날짜: date,
-              품목: item.식품명,
-              수량: del.수량,
-              단가: item.단가,
-            });
+            temp[date] = temp[date] || [];
+            temp[date].push({ 발주처: school, 낙찰기업: vendor });
           });
         });
       });
-
       setCalendarData(temp);
-      setVendors(["전체", ...Array.from(vset)]);
-      setSchools(["전체", ...Array.from(sset)]);
-    };
-    fetchData();
+    });
   }, [selectedYM]);
 
   const handleClick = async (school: string, vendor: string, date: string) => {
-    setModalSchool(school);
-    setModalVendor(vendor);
     setModalDate(date);
+    // 학교 문서 로드
     const ymCode = selectedYM.replace("-", "").slice(2);
-    const docId = `${ymCode}_${school}`;
-    const docRef = doc(db, "school", docId);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      setModalDoc(docSnap.data());
-      setModalOpen(true);
-    } else {
-      alert("데이터 없음");
-    }
+    const schoolDocId = `${ymCode}_${school}`;
+    const schoolSnap = await getDoc(doc(db, "school", schoolDocId));
+    if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
+    // 벤더 문서 로드
+    const vendorSnap = await getDoc(doc(db, "school", vendor));
+    if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
+    setModalOpen(true);
   };
 
   const doPrint = () => window.print();
 
-  const year = selectedYM.slice(0, 4);
+  const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", now));
   const end = endOfMonth(start);
@@ -107,104 +95,106 @@ export default function Print() {
 
   return (
     <>
-      <div className="p-4 max-w-screen-xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-          <select value={selectedYM} onChange={(e) => setSelectedYM(e.target.value)} className="border p-2 rounded">
-            {months.map((m) => {
-              const ym = `${year}-${m}`;
-              return <option key={ym} value={ym}>{ym}</option>;
-            })}
-          </select>
-          <select value={filterVendor} onChange={(e) => setFilterVendor(e.target.value)} className="border p-2 rounded">
-            {vendors.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-          <select value={filterSchool} onChange={(e) => setFilterSchool(e.target.value)} className="border p-2 rounded">
-            {schools.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button onClick={doPrint} className="bg-blue-500 text-white px-4 py-2 rounded shadow">
-            Excel/PDF 프린트
-          </button>
-        </div>
-        <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
-        <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
-          {['월','화','수','목','금'].map((d) => <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>)}
-        </div>
-        <div className="grid grid-cols-5 gap-2 text-xs">
-          {leadingEmpty.map((_, i) => <div key={i} />)}
-          {allDays.map((day) => {
-            const dateStr = format(day, 'yyyy-MM-dd');
-            const items = (calendarData[dateStr] || []).filter(
-              (i) => (filterVendor === "전체" || i.낙찰기업 === filterVendor) &&
-                     (filterSchool === "전체" || i.발주처 === filterSchool)
-            );
-            const grouped: Record<string, { 낙찰기업: string; lines: ScheduleObj[] }> = {};
-            items.forEach((i) => {
-              if (!grouped[i.발주처]) grouped[i.발주처] = { 낙찰기업: i.낙찰기업, lines: [] };
-              grouped[i.발주처].lines.push(i);
-            });
+      <Head>
+        <style>{`
+          @page { size: A4; margin: 20mm; }
+          @media print {
+            html, body { margin:0; padding:0; }
+            .no-print { display: none !important; }
+            .page-break { page-break-inside: avoid; }
+          }
+        `}</style>
+      </Head>
+      <div className="no-print p-4 max-w-screen-xl mx-auto">
+        {/* 월 셀렉트만 */}
+        <select
+          value={selectedYM}
+          onChange={(e) => setSelectedYM(e.target.value)}
+          className="border p-2 rounded"
+        >
+          {months.map((m) => {
+            const ym = `${year}-${m}`;
             return (
-              <div key={dateStr} className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-hidden">
-                <div className="font-bold mb-1">{format(day, 'd')}</div>
-                {Object.entries(grouped).map(([school, obj], idx) => (
-                  <div key={idx} onClick={() => handleClick(school, obj.낙찰기업, dateStr)} className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}> 
-                    <span className="font-semibold underline">{school}</span>
-                    <ul className="pl-2 list-disc list-inside">
-                      {Array.from(new Set(obj.lines.map(l => `${l.품목} (${getKg(l.수량, "kg")})`))).map((text, li) => (
-                        <li key={li}>{text}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
+              <option key={ym} value={ym}>
+                {ym}
+              </option>
             );
           })}
-        </div>
+        </select>
       </div>
-      {modalOpen && modalDoc && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-screen-md p-6 rounded shadow-lg overflow-auto" style={{ maxHeight: '90vh' }}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">거래명세표 ({modalDate})</h3>
-              <button onClick={() => setModalOpen(false)} className="text-red-500">닫기</button>
-            </div>
-            <div className="mb-4">
-              <p><strong>발주처:</strong> {modalDoc.발주처}</p>
+
+      {modalOpen && modalDoc && modalVendorDoc && (
+        <div className="p-4 page-break max-w-screen-md mx-auto">
+          <h2 className="text-center text-xl font-bold mb-4">
+            거래명세표 ({modalDate})
+          </h2>
+          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+            <div>
+              <p><strong>공급받는자:</strong> {modalDoc.발주처}</p>
               <p><strong>사업자등록번호:</strong> {modalDoc.사업자등록번호}</p>
               <p><strong>주소:</strong> {modalDoc.사업장주소}</p>
               <p><strong>대표전화:</strong> {modalDoc.대표전화번호}</p>
-              <p><strong>낙찰기업:</strong> {modalDoc.낙찰기업}</p>
             </div>
-            <table className="w-full table-auto border-collapse text-xs">
-              <thead>
-                <tr>
-                  <th className="border p-1">품목</th>
-                  <th className="border p-1">수량</th>
-                  <th className="border p-1">단가</th>
-                  <th className="border p-1">공급가액</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from(new Map(
-                  modalDoc.품목
-                    .filter((item: any) => item.납품 && item.납품[modalDate])
-                    .map((item: any) => [item.식품명, item])
-                ).values()).map((item: any, i: number) => {
-                  const qty = item.납품[modalDate].수량;
-                  const price = item.단가;
+            <div>
+              <p><strong>공급하는자:</strong> {modalVendorDoc.상호명}</p>
+              <p><strong>대표자:</strong> {modalVendorDoc.대표자}</p>
+              <p><strong>사업자등록번호:</strong> {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
+              <p><strong>대표전화:</strong> {modalVendorDoc.대표전화번호}</p>
+              <p><strong>주소:</strong> {modalVendorDoc.주소}</p>
+            </div>
+          </div>
+          <table className="w-full border-collapse text-sm mb-4">
+            <thead>
+              <tr>
+                <th className="border px-2 py-1">품목</th>
+                <th className="border px-2 py-1">수량</th>
+                <th className="border px-2 py-1">단가</th>
+                <th className="border px-2 py-1">공급가액</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const items = modalDoc.품목.filter((it) => it.납품[modalDate]);
+                const unique = Array.from(
+                  new Map(items.map((it) => [it.품목, it])).values()
+                );
+                unique.forEach((it) => {
+                  it.납품[modalDate].금액 = it.납품[modalDate].수량 * it.납품[modalDate].단가;
+                });
+                return unique.map((it, idx) => {
+                  const del = it.납품[modalDate];
                   return (
-                    <tr key={i}>
-                      <td className="border p-1">{item.식품명}</td>
-                      <td className="border p-1 text-right">{qty}</td>
-                      <td className="border p-1 text-right">{price}</td>
-                      <td className="border p-1 text-right">{qty * price}</td>
+                    <tr key={idx}>
+                      <td className="border px-2 py-1">{it.품목}</td>
+                      <td className="border px-2 py-1 text-right">{del.수량}</td>
+                      <td className="border px-2 py-1 text-right">{del.단가}</td>
+                      <td className="border px-2 py-1 text-right">{del.금액}</td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-            <div className="mt-4 flex justify-end">
-              <button onClick={doPrint} className="bg-blue-500 text-white px-4 py-2 rounded">인쇄하기</button>
-            </div>
+                });
+              })()}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="border px-2 py-1 text-right font-bold" colSpan={3}>합계</td>
+                <td className="border px-2 py-1 text-right font-bold">
+                  {modalDoc.품목
+                    .filter((it) => it.납품[modalDate])
+                    .reduce(
+                      (sum, it) => sum + it.납품[modalDate].수량 * it.납품[modalDate].단가,
+                      0
+                    )}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <div className="flex justify-center no-print">
+            <button
+              onClick={doPrint}
+              className="px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              인쇄하기
+            </button>
           </div>
         </div>
       )}
