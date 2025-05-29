@@ -53,7 +53,7 @@ export default function Print() {
         if (!id.startsWith(selectedYM.replace("-", "").slice(2))) return;
         const data = docSnap.data();
         const schoolName = data.발주처;
-        const vendorName = data.납찰기업;
+        const vendorName = data.낙찰기업;
         vset.add(vendorName);
         sset.add(schoolName);
         (data.품목 || []).forEach((item: any) => {
@@ -125,7 +125,7 @@ export default function Print() {
             Excel/PDF 프린트
           </button>
         </div>
-        <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
+        <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} �발주 달력</h2>
         <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
           {['월','화','수','목','금'].map((d) => <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>)}
         </div>
@@ -146,10 +146,10 @@ export default function Print() {
               <div key={dateStr} className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-hidden">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
                 {Object.entries(grouped).map(([school, obj], idx) => (
-                  <div key={idx} onClick={() => handleClick(school, obj.낙찰기업, dateStr)} className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}>
+                  <div key={idx} onClick={() => handleClick(school, obj.낙찰기업, dateStr)} className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}> 
                     <span className="font-semibold underline">{school}</span>
                     <ul className="pl-2 list-disc list-inside">
-                      {[...new Set(obj.lines.map(l => `${l.품목} (${getKg(l.수량, "kg")})`))].map((text, li) => (
+                      {Array.from(new Set(obj.lines.map(l => `${l.품목} (${getKg(l.수량, "kg")})`))).map((text, li) => (
                         <li key={li}>{text}</li>
                       ))}
                     </ul>
