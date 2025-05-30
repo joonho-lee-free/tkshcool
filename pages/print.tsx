@@ -33,8 +33,7 @@ type DocData = {
   낙찰기업: string;
   품목: Array<{
     식품명: string;
-    납품: Record<string, { 수량: number; 단가: number }>;
-    단가: number;
+    납품: Record<string, { 수량: number; 단가: number; 금액: number }>;
   }>;
 };
 
@@ -56,9 +55,11 @@ export default function Print() {
   const now = new Date();
   const defaultYM = format(now, "yyyy-MM");
   const [selectedYM, setSelectedYM] = useState(defaultYM);
+  const [selectedVendor, setSelectedVendor] = useState<string>("전체");
 
   // Calendar data: date -> list of schedule items
   const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
+  const [vendors, setVendors] = useState<string[]>([]);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -66,17 +67,21 @@ export default function Print() {
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
-  // Load calendar data for selected month
+  // Load calendar and vendor dropdown data
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
     getDocs(collection(db, "school")).then((snap) => {
       const temp: Record<string, ScheduleObj[]> = {};
+      const vendorSet = new Set<string>();
+
       snap.docs.forEach((docSnap) => {
         const id = docSnap.id;
         if (!id.startsWith(ymCode)) return;
         const data = docSnap.data() as any;
         const school = data.발주처;
         const vendor = data.낙찰기업 || data.납찰기업;
+        vendorSet.add(vendor);
+
         (data.품목 || []).forEach((item: any) => {
           Object.entries(item.납품 || {}).forEach(([date, del]: [string, any]) => {
             if (!temp[date]) temp[date] = [];
@@ -91,7 +96,9 @@ export default function Print() {
           });
         });
       });
+
       setCalendarData(temp);
+      setVendors(["전체", ...Array.from(vendorSet)]);
     });
   }, [selectedYM]);
 
@@ -108,15 +115,17 @@ export default function Print() {
 
   const doPrint = () => window.print();
 
-  // Calendar days calculation
+  // Calendar days calculation with correct Monday alignment
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-  const start = startOfMonth(parse(`${selectedYM}-01`, "yyyy-MM-dd", now));
+  const firstOfMonth = parse(`${selectedYM}-01`, "yyyy-MM-dd", now);
+  const start = startOfMonth(firstOfMonth);
   const end = endOfMonth(start);
   const allDays = eachDayOfInterval({ start, end }).filter(
     (d) => getDay(d) >= 1 && getDay(d) <= 5
   );
-  const leadingEmpty = Array((getDay(start) + 6) % 7).fill(null);
+  const dow = getDay(firstOfMonth); // 0=Sun,1=Mon...
+  const leadingEmpty = Array(dow > 0 ? dow - 1 : 4).fill(null);
 
   return (
     <>
@@ -133,8 +142,8 @@ export default function Print() {
         `}</style>
       </Head>
 
-      {/* Month selector */}
-      <div className="no-print p-4 max-w-screen-xl mx-auto">
+      {/* Controls */}
+      <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
         <select
           value={selectedYM}
           onChange={(e) => setSelectedYM(e.target.value)}
@@ -142,6 +151,15 @@ export default function Print() {
         >
           {months.map((m) => (
             <option key={m} value={`${year}-${m}`}>{`${year}-${m}`}</option>
+          ))}
+        </select>
+        <select
+          value={selectedVendor}
+          onChange={(e) => setSelectedVendor(e.target.value)}
+          className="border p-2 rounded"
+        >
+          {vendors.map((v) => (
+            <option key={v} value={v}>{v}</option>
           ))}
         </select>
       </div>
@@ -158,26 +176,32 @@ export default function Print() {
           {leadingEmpty.map((_, idx) => <div key={idx} />)}
           {allDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
-            const items = calendarData[dateStr] || [];
-            const grouped: Record<string, { 낙찰기업: string; lines: ScheduleObj[] }> = {};
-            items.forEach((it) => {
-              if (!grouped[it.발주처]) grouped[it.발주처] = { 낙찰기업: it.낙찰기업, lines: [] };
-              grouped[it.발주처].lines.push(it);
+            let items = calendarData[dateStr] || [];
+            if (selectedVendor !== '전체') {
+              items = items.filter(it => it.낙찰기업 === selectedVendor);
+            }
+
+            const grouped: Record<string, ScheduleObj[]> = {};
+            items.forEach(it => {
+              (grouped[it.발주처] ||= []).push(it);
             });
+
             return (
-              <div key={dateStr} className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto">
+              <div key={dateStr} className="border rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
-                {Object.entries(grouped).map(([school, obj], i) => {
+                {Object.entries(grouped).map(([school, lines]) => {
                   const uniqueList = Array.from(
-                    new Set(obj.lines.map((l) => `${l.품목} (${getKg(l.수량)})`))
+                    new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`))
                   );
                   return (
-                    <div key={i} onClick={() => handleClick(school, obj.낙찰기업, dateStr)} className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}>\
-n                      <span className="font-semibold underline">{school}</span>
+                    <div
+                      key={school}
+                      onClick={() => handleClick(school.trim(), lines[0].낙찰기업, dateStr)}
+                      className={`mb-1 cursor-pointer ${getColorClass(lines[0].낙찰기업)}`}
+                    >
+                      <span className="font-semibold underline">{school.trim()}</span>
                       <ul className="pl-2 list-disc list-inside">
-                        {uniqueList.map((text, idx) => (
-                          <li key={idx}>{text}</li>
-                        ))}
+                        {uniqueList.map((text, i) => <li key={i}>{text}</li>)}
                       </ul>
                     </div>
                   );
@@ -220,20 +244,16 @@ n                      <span className="font-semibold underline">{school}</span>
               </thead>
               <tbody>
                 {(() => {
-                  const items = modalDoc.품목.filter((it) => it.납품[modalDate]);
-                  const unique = Array.from(
-                    new Map(items.map((it) => [it.식품명, it])).values()
-                  );
+                  const items = modalDoc.품목.filter(it => it.납품[modalDate]);
+                  const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
                   return unique.map((it, idx) => {
                     const d = it.납품[modalDate];
-                    const unitPrice = it.단가;
-                    const amount = d.수량 * unitPrice;
                     return (
                       <tr key={idx}>
                         <td className="border px-2 py-1">{it.식품명}</td>
                         <td className="border px-2 py-1 text-right">{d.수량}</td>
-                        <td className="border px-2 py-1 text-right">{unitPrice}</td>
-                        <td className="border px-2 py-1 text-right">{amount}</td>
+                        <td className="border px-2 py-1 text-right">{d.단가}</td>
+                        <td className="border px-2 py-1 text-right">{d.금액}</td>
                       </tr>
                     );
                   });
@@ -241,11 +261,10 @@ n                      <span className="font-semibold underline">{school}</span>
               </tbody>
               <tfoot>
                 <tr>
-                  <td className="border px-2 py-1 text-right font-bold" colSpan={3}>합계</td>
-                  <td className="border px-2 py-1 text-right font-bold">{
-                    modalDoc.품목.filter((it) => it.납품[modalDate])
-                      .reduce((sum, it) => sum + it.납품[modalDate].수량 * it.단가, 0)
-                  }</td>
+                  <td colSpan={3} className="border px-2 py-1 text-right font-bold">합계</td>
+                  <td className="border px-2 py-1 text-right font-bold">
+                    {modalDoc.품목.filter(it => it.납품[modalDate]).reduce((sum, it) => sum + it.납품[modalDate].금액, 0)}
+                  </td>
                 </tr>
               </tfoot>
             </table>
