@@ -34,6 +34,7 @@ type DocData = {
   품목: Array<{
     식품명: string;
     납품: Record<string, { 수량: number; 단가: number }>;
+    단가: number;
   }>;
 };
 
@@ -126,7 +127,6 @@ export default function Print() {
             html, body { margin:0; padding:0; }
             .no-print { display: none !important; }
             .page-break { page-break-inside: avoid; }
-            /* Ensure modal prints from top */
             .modal-overlay { position: static !important; background: none !important; }
             .modal-container { margin-top: 0 !important; }
           }
@@ -165,22 +165,15 @@ export default function Print() {
               grouped[it.발주처].lines.push(it);
             });
             return (
-              <div
-                key={dateStr}
-                className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto"
-              >
+              <div key={dateStr} className="border border-gray-300 rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
                 {Object.entries(grouped).map(([school, obj], i) => {
                   const uniqueList = Array.from(
                     new Set(obj.lines.map((l) => `${l.품목} (${getKg(l.수량)})`))
                   );
                   return (
-                    <div
-                      key={i}
-                      onClick={() => handleClick(school, obj.낙찰기업, dateStr)}
-                      className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}
-                    >
-                      <span className="font-semibold underline">{school}</span>
+                    <div key={i} onClick={() => handleClick(school, obj.낙찰기업, dateStr)} className={`mb-1 cursor-pointer ${getColorClass(obj.낙찰기업)}`}>\
+n                      <span className="font-semibold underline">{school}</span>
                       <ul className="pl-2 list-disc list-inside">
                         {uniqueList.map((text, idx) => (
                           <li key={idx}>{text}</li>
@@ -199,10 +192,7 @@ export default function Print() {
       {modalOpen && modalDoc && modalVendorDoc && (
         <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-black no-print"
-              onClick={() => setModalOpen(false)}
-            >닫기</button>
+            <button className="absolute top-2 right-2 text-gray-500 hover:text-black no-print" onClick={() => setModalOpen(false)}>닫기</button>
             <h2 className="text-center text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
@@ -236,12 +226,13 @@ export default function Print() {
                   );
                   return unique.map((it, idx) => {
                     const d = it.납품[modalDate];
-                    const amount = d.수량 * d.단가;
+                    const unitPrice = it.단가;
+                    const amount = d.수량 * unitPrice;
                     return (
                       <tr key={idx}>
                         <td className="border px-2 py-1">{it.식품명}</td>
                         <td className="border px-2 py-1 text-right">{d.수량}</td>
-                        <td className="border px-2 py-1 text-right">{d.단가}</td>
+                        <td className="border px-2 py-1 text-right">{unitPrice}</td>
                         <td className="border px-2 py-1 text-right">{amount}</td>
                       </tr>
                     );
@@ -251,12 +242,10 @@ export default function Print() {
               <tfoot>
                 <tr>
                   <td className="border px-2 py-1 text-right font-bold" colSpan={3}>합계</td>
-                  <td className="border px-2 py-1 text-right font-bold">
-                    {modalDoc.품목
-                      .filter((it) => it.납품[modalDate])
-                      .reduce((sum, it) => sum + it.납품[modalDate].수량 * it.납품[modalDate].단가, 0)
-                    }
-                  </td>
+                  <td className="border px-2 py-1 text-right font-bold">{
+                    modalDoc.품목.filter((it) => it.납품[modalDate])
+                      .reduce((sum, it) => sum + it.납품[modalDate].수량 * it.단가, 0)
+                  }</td>
                 </tr>
               </tfoot>
             </table>
