@@ -21,7 +21,8 @@ type ScheduleObj = {
   날짜: string;
   품목: string;
   수량: number;
-  단가: number;
+  계약단가: number;
+  공급가액: number;
 };
 
 // Firestore data for school document
@@ -33,7 +34,7 @@ type DocData = {
   낙찰기업: string;
   품목: Array<{
     식품명: string;
-    납품: Record<string, { 수량: number; 단가: number }>;
+    납품: Record<string, { 수량: number; 계약단가: number; 공급가액: number }>;
   }>;
 };
 
@@ -90,8 +91,9 @@ export default function Print() {
               낙찰기업: vendor,
               날짜: date,
               품목: item.식품명,
-              수량: del.수량,
-              단가: del.단가 || 0,
+              수량: del.수량 || 0,
+              계약단가: del.계약단가 || 0,
+              공급가액: del.공급가액 || 0,
             });
           });
         });
@@ -217,7 +219,7 @@ export default function Print() {
         <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
             <button className="absolute top-2 right-2 text-gray-500 hover:text-black no-print" onClick={() => setModalOpen(false)}>닫기</button>
-            <h2 className="text-center text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
+            <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
                 <strong>공급받는자:</strong> {modalDoc.발주처}
@@ -236,10 +238,10 @@ export default function Print() {
             <table className="w-full border-collapse text-sm mb-4">
               <thead>
                 <tr>
-                  <th className="border px-2 py-1 w-1/3">품목</th>
-                  <th className="border px-2 py-1 w-1/6">수량</th>
-                  <th className="border px-2 py-1 w-1/6">단가</th>
-                  <th className="border px-2 py-1 w-1/3">공급가액</th>
+                  <th className="border px-2 py-1 w-1/3 text-left">품목</th>
+                  <th className="border px-2 py-1 w-1/6 text-left">수량</th>
+                  <th className="border px-2 py-1 w-1/6 text-left">단가</th>
+                  <th className="border px-2 py-1 w-1/3 text-left">공급가액</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,14 +250,12 @@ export default function Print() {
                   const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
                   return unique.map((it, idx) => {
                     const d = it.납품[modalDate];
-                    const unitPrice = d.단가 || 0;
-                    const amount = d.수량 * unitPrice;
                     return (
                       <tr key={idx}>
-                        <td className="border px-2 py-1">{it.식품명}</td>
-                        <td className="border px-2 py-1 text-right">{d.수량 || "–"}</td>
-                        <td className="border px-2 py-1 text-right">{unitPrice > 0 ? unitPrice : "–"}</td>
-                        <td className="border px-2 py-1 text-right">{unitPrice > 0 ? amount : "–"}</td>
+                        <td className="border px-2 py-1 text-left">{it.식품명}</td>
+                        <td className="border px-2 py-1 text-left">{d.수량 || "–"}</td>
+                        <td className="border px-2 py-1 text-left">{d.계약단가 > 0 ? d.계약단가 : "–"}</td>
+                        <td className="border px-2 py-1 text-left">{d.공급가액 > 0 ? d.공급가액 : "–"}</td>
                       </tr>
                     );
                   });
@@ -263,21 +263,20 @@ export default function Print() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} className="border px-2 py-1 text-right font-bold">합계</td>
-                  <td className="border px-2 py-1 text-right font-bold">
+                  <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
+                  <td className="border px-2 py-1 text-left font-bold">
                     {modalDoc.품목
                       .filter(it => it.납품[modalDate])
                       .reduce((sum, it) => {
                         const d = it.납품[modalDate];
-                        const price = d.단가 || 0;
-                        return sum + (price > 0 ? d.수량 * price : 0);
+                        return sum + (d.공급가액 || 0);
                       }, 0)
                     }
                   </td>
                 </tr>
               </tfoot>
             </table>
-            <div className="flex justify-center no-print">
+            <div className="flex justify-start no-print">
               <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">인쇄하기</button>
             </div>
           </div>
