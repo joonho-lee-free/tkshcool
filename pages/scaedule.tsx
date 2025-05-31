@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { db } from '../firebase';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { db } from '../../lib/firebase'; // 상대경로로 import 경로 수정
 
 interface ExcelRow {
   id: string;
