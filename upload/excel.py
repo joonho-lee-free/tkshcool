@@ -1,17 +1,12 @@
 import pandas as pd
 from pathlib import Path
 from openpyxl import load_workbook
-import re
 
-def merge_contract_price(order_file_path: Path, price_file_path: Path, output_dir: Path):
-    # 저장 폴더가 없다면 생성
+def merge_contract_price(order_file_path, price_file_path, output_dir):
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    # 계약단가 엑셀 로드 (4번째 줄이 실제 헤더)
     price_df = pd.read_excel(price_file_path, header=3)
     price_df.columns = price_df.columns.astype(str).str.strip()
 
-    # 식품 공통코드명 ↔ ②입찰단가 매핑
     price_map = dict(
         zip(
             price_df["식품 공통코드명"].astype(str).str.strip(),
@@ -19,29 +14,37 @@ def merge_contract_price(order_file_path: Path, price_file_path: Path, output_di
         )
     )
 
-    # 발주서 엑셀 로드
-    wb = load_workbook(order_file_path, data_only=True)
+    wb = load_workbook(order_file_path)
     ws = wb.active
 
-    # --- 기존 병합 로직 그대로 유지 ---
-    # 예: 원본 시트에서 데이터를 읽어와 단가를 채워넣는 작업
-    # for row in ws.iter_rows(min_row=5):
-    #     code = row[0].value
-    #     if code in price_map:
-    #         row[5].value = price_map[code]
-    # -----------------------------------
+    header_row = None
+    for i, row in enumerate(ws.iter_rows(min_row=1, max_row=20), 1):
+        if row[0].value == "NO":
+            header_row = i
+            break
+    if header_row is None:
+        raise ValueError("❌ 헤더 행을 찾을 수 없습니다 (NO 기준)")
 
-    # 파일명에서 prefix(낙찰월), school(발주처), vendor(낙찰기업) 추출
-    stem = order_file_path.stem
-    m = re.match(r"(\d{4})_(.+?)_발주서_(.+)", stem)
-    if m:
-        prefix, school, vendor = m.groups()
-        # 업로드용 suffix 추가
-        output_filename = f"{prefix}_{school}_발주서_{vendor}_업로드용.xlsx"
-    else:
-        # fallback
-        output_filename = stem.replace("발주서", "발주서_업로드용") + ".xlsx"
+    식품명_col = None
+    for cell in ws[header_row]:
+        if cell.value and "식품명" in str(cell.value):
+            식품명_col = cell.col_idx
+            break
+    if 식품명_col is None:
+        raise ValueError("❌ '식품명' 열을 찾을 수 없습니다.")
 
+    last_col = ws.max_column
+    계약단가_col = last_col + 1
+    ws.cell(row=header_row, column=계약단가_col, value="계약단가")
+
+    for row in range(header_row + 1, ws.max_row + 1):
+        식품명 = ws.cell(row=row, column=식품명_col).value
+        if 식품명 and str(식품명).strip().lower() not in ["nan", ""]:
+            matched_price = price_map.get(str(식품명).strip(), "")
+            ws.cell(row=row, column=계약단가_col, value=matched_price)
+
+    # 파일명 뒤에 _업로드용 붙이기
+    output_filename = order_file_path.stem + "_업로드용.xlsx"
     output_path = output_dir / output_filename
     wb.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
@@ -49,18 +52,28 @@ def merge_contract_price(order_file_path: Path, price_file_path: Path, output_di
 
 
 if __name__ == "__main__":
-    # 경로 설정 (예시)
     base_dir = Path("C:/school/upload")
     output_dir = base_dir / "excel"
 
-    # 발주서 파일 패턴: 202405_강남초_발주서_에스에이치유통.xlsx 등
-    for order_file in base_dir.glob("*_발주서_*.xlsx"):
-        m = re.match(r"(\d{4})_(.+?)_발주서_(.+)\.xlsx", order_file.name)
-        if not m:
+    # 모든 발주서 파일 찾아서
+    order_files = list(base_dir.glob("*_발주서_*.xlsx"))
+
+    for order_file in order_files:
+        name_parts = order_file.stem.split("_")  # ['2505', '경남중', '발주서', '이가에프엔비']
+        if len(name_parts) < 4:
+            print(f"⚠️ 파일 이름 형식 오류: {order_file.name}")
             continue
-        prefix, school, vendor = m.groups()
-        price_file = base_dir / f"{prefix}_{school}_계약단가.xlsx"
-        if price_file.exists():
+
+        yyyymm = name_parts[0]
+        school = name_parts[1]
+
+        # 계약단가 파일 찾기
+        price_file = base_dir / f"{yyyymm}_{school}_계약단가.xlsx"
+        if not price_file.exists():
+            print(f"❌ 계약단가 파일 없음: {price_file.name}")
+            continue
+
+        try:
             merge_contract_price(order_file, price_file, output_dir)
-        else:
-            print(f"⚠️ 계약단가 파일 없음: {price_file.name}")
+        except Exception as e:
+            print(f"❌ 처리 실패: {order_file.name} → {e}")

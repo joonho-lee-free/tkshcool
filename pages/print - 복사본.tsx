@@ -33,7 +33,7 @@ type DocData = {
   낙찰기업: string;
   품목: Array<{
     식품명: string;
-    납품: Record<string, { 수량: number; 단가: number }>;
+    납품: Record<string, { 수량: number; 단가: number; 금액: number }>;
   }>;
 };
 
@@ -91,7 +91,7 @@ export default function Print() {
               날짜: date,
               품목: item.식품명,
               수량: del.수량,
-              단가: del.단가 || 0,
+              단가: del.단가,
             });
           });
         });
@@ -108,7 +108,7 @@ export default function Print() {
     const ymCode = selectedYM.replace("-", "").slice(2);
     const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
     if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
-    const vendorSnap = await getDoc(doc(db, "vendor", vendor));
+    const vendorSnap = await getDoc(doc(db, "school", vendor));
     if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
     setModalOpen(true);
   };
@@ -221,25 +221,25 @@ export default function Print() {
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
                 <strong>공급받는자:</strong> {modalDoc.발주처}
-                <p>사업자등록번호: {modalDoc.사업자등록번호 || "–"}</p>
-                <p>주소: {modalDoc.사업장주소 || "–"}</p>
-                <p>대표전화: {modalDoc.대표전화번호 || "–"}</p>
+                <p>사업자등록번호: {modalDoc.사업자등록번호}</p>
+                <p>주소: {modalDoc.사업장주소}</p>
+                <p>대표전화: {modalDoc.대표전화번호}</p>
               </div>
               <div>
                 <strong>공급하는자:</strong> {modalVendorDoc.상호명}
-                <p>대표자: {modalVendorDoc.대표자 || "–"}</p>
-                <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호 || "–"}</p>
-                <p>대표전화: {modalVendorDoc.대표전화번호 || "–"}</p>
-                <p>주소: {modalVendorDoc.주소 || "–"}</p>
+                <p>대표자: {modalVendorDoc.대표자}</p>
+                <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
+                <p>대표전화: {modalVendorDoc.대표전화번호}</p>
+                <p>주소: {modalVendorDoc.주소}</p>
               </div>
             </div>
             <table className="w-full border-collapse text-sm mb-4">
               <thead>
                 <tr>
-                  <th className="border px-2 py-1 w-1/3">품목</th>
-                  <th className="border px-2 py-1 w-1/6">수량</th>
-                  <th className="border px-2 py-1 w-1/6">단가</th>
-                  <th className="border px-2 py-1 w-1/3">공급가액</th>
+                  <th className="border px-2 py-1">품목</th>
+                  <th className="border px-2 py-1">수량</th>
+                  <th className="border px-2 py-1">단가</th>
+                  <th className="border px-2 py-1">공급가액</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,14 +248,12 @@ export default function Print() {
                   const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
                   return unique.map((it, idx) => {
                     const d = it.납품[modalDate];
-                    const unitPrice = d.단가 || 0;
-                    const amount = d.수량 * unitPrice;
                     return (
                       <tr key={idx}>
                         <td className="border px-2 py-1">{it.식품명}</td>
-                        <td className="border px-2 py-1 text-right">{d.수량 || "–"}</td>
-                        <td className="border px-2 py-1 text-right">{unitPrice > 0 ? unitPrice : "–"}</td>
-                        <td className="border px-2 py-1 text-right">{unitPrice > 0 ? amount : "–"}</td>
+                        <td className="border px-2 py-1 text-right">{d.수량}</td>
+                        <td className="border px-2 py-1 text-right">{d.단가}</td>
+                        <td className="border px-2 py-1 text-right">{d.금액}</td>
                       </tr>
                     );
                   });
@@ -265,14 +263,7 @@ export default function Print() {
                 <tr>
                   <td colSpan={3} className="border px-2 py-1 text-right font-bold">합계</td>
                   <td className="border px-2 py-1 text-right font-bold">
-                    {modalDoc.품목
-                      .filter(it => it.납품[modalDate])
-                      .reduce((sum, it) => {
-                        const d = it.납품[modalDate];
-                        const price = d.단가 || 0;
-                        return sum + (price > 0 ? d.수량 * price : 0);
-                      }, 0)
-                    }
+                    {modalDoc.품목.filter(it => it.납품[modalDate]).reduce((sum, it) => sum + it.납품[modalDate].금액, 0)}
                   </td>
                 </tr>
               </tfoot>
