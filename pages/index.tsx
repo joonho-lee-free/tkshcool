@@ -9,6 +9,8 @@ import {
   eachDayOfInterval,
   getDay,
   parse,
+  startOfYear,
+  endOfYear,
 } from "date-fns";
 
 // Utility to render kilogram string
@@ -21,8 +23,8 @@ type ScheduleObj = {
   날짜: string;
   품목: string;
   수량: number;
-  계약단가: number;    // 변경: 기존 단가 → 계약단가
-  공급가액: number;    // 변경: 기존 금액 → 공급가액
+  계약단가: number;
+  공급가액: number;
 };
 
 // Firestore data for school document
@@ -34,10 +36,7 @@ type DocData = {
   낙찰기업: string;
   품목: Array<{
     식품명: string;
-    납품: Record<
-      string,
-      { 수량: number; 계약단가: number; 공급가액: number }
-    >; // 변경: 단가→계약단가, 금액→공급가액
+    납품: Record<string, { 수량: number; 계약단가: number; 공급가액: number }>;
   }>;
 };
 
@@ -71,6 +70,9 @@ export default function Print() {
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
+  // Year mapping state
+  const [yearMapping, setYearMapping] = useState<string[]>([]);
+
   // Load calendar and vendor dropdown data
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
@@ -95,8 +97,8 @@ export default function Print() {
               날짜: date,
               품목: item.식품명,
               수량: del.수량 || 0,
-              계약단가: del.계약단가 || 0, // 수정: 계약단가 필드에서 가져오기
-              공급가액: del.공급가액 || 0, // 수정: 공급가액 필드에서 가져오기
+              계약단가: del.계약단가 || 0,
+              공급가액: del.공급가액 || 0,
             });
           });
         });
@@ -107,17 +109,26 @@ export default function Print() {
     });
   }, [selectedYM]);
 
+  // Generate mapping for all dates in 2025
+  useEffect(() => {
+    const startYear = startOfYear(new Date(2025, 0, 1));
+    const endYear = endOfYear(startYear);
+    const allDates = eachDayOfInterval({ start: startYear, end: endYear });
+    const mappings = allDates.map((d) =>
+      `${format(d, "yyyy-MM-dd")} (${format(d, "EEEE")})`
+    );
+    setYearMapping(mappings);
+  }, []);
+
   // Handle click on a school in calendar
   const handleClick = async (school: string, vendor: string, date: string) => {
     setModalDate(date);
     const ymCode = selectedYM.replace("-", "").slice(2);
     const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
     if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
-
     // vendor documents are also stored under "school" collection
     const vendorSnap = await getDoc(doc(db, "school", vendor));
     if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
-
     setModalOpen(true);
   };
 
@@ -132,8 +143,8 @@ export default function Print() {
   const allDays = eachDayOfInterval({ start, end }).filter(
     (d) => getDay(d) >= 1 && getDay(d) <= 5
   );
-  const dow = getDay(firstOfMonth); // 0=Sun,1=Mon...
-  const leadingEmpty = Array(dow > 0 ? dow - 1 : 4).fill(null);
+  const dow = getDay(firstOfMonth); // 0=일,1=월...
+  const leadingEmpty = Array(dow === 0 ? 0 : dow - 1).fill(null);
 
   return (
     <>
@@ -172,57 +183,54 @@ export default function Print() {
         </select>
       </div>
 
+      {/* Year Mapping Display */}
+      <div className="p-4 max-w-screen-xl mx-auto mb-6">
+        <h2 className="text-xl font-bold mb-2">2025년 요일-일자 매핑</h2>
+        <div className="h-64 overflow-y-auto text-sm border rounded p-2">
+          {yearMapping.map((mapStr, idx) => (
+            <div key={idx}>{mapStr}</div>
+          ))}
+        </div>
+      </div>
+
       {/* Calendar UI */}
       <div className="no-print p-4 max-w-screen-xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
         <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
-          {["월", "화", "수", "목", "금"].map((d) => (
-            <div key={d} className="bg-gray-100 py-1 rounded">
-              {d}
-            </div>
+          {['월','화','수','목','금'].map((d) => (
+            <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>
           ))}
         </div>
         <div className="grid grid-cols-5 gap-2 text-xs">
-          {leadingEmpty.map((_, idx) => (
-            <div key={idx} />
-          ))}
+          {leadingEmpty.map((_, idx) => <div key={idx} />)}
           {allDays.map((day) => {
-            const dateStr = format(day, "yyyy-MM-dd");
+            const dateStr = format(day, 'yyyy-MM-dd');
             let items = calendarData[dateStr] || [];
-            if (selectedVendor !== "전체") {
-              items = items.filter((it) => it.낙찰기업 === selectedVendor);
+            if (selectedVendor !== '전체') {
+              items = items.filter(it => it.낙찰기업 === selectedVendor);
             }
 
             const grouped: Record<string, ScheduleObj[]> = {};
-            items.forEach((it) => {
+            items.forEach(it => {
               (grouped[it.발주처] ||= []).push(it);
             });
 
             return (
-              <div
-                key={dateStr}
-                className="border rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto"
-              >
-                <div className="font-bold mb-1">{format(day, "d")}</div>
+              <div key={dateStr} className="border rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto">
+                <div className="font-bold mb-1">{format(day, 'd')}</div>
                 {Object.entries(grouped).map(([school, lines]) => {
                   const uniqueList = Array.from(
-                    new Set(lines.map((l) => `${l.품목} (${getKg(l.수량)})`))
+                    new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`))
                   );
                   return (
                     <div
                       key={school}
-                      onClick={() =>
-                        handleClick(school.trim(), lines[0].낙찰기업, dateStr)
-                      }
-                      className={`mb-1 cursor-pointer ${getColorClass(
-                        lines[0].낙찰기업
-                      )}`}
+                      onClick={() => handleClick(school.trim(), lines[0].낙찰기업, dateStr)}
+                      className={`mb-1 cursor-pointer ${getColorClass(lines[0].낙찰기업)}`}
                     >
                       <span className="font-semibold underline">{school.trim()}</span>
                       <ul className="pl-2 list-disc list-inside">
-                        {uniqueList.map((text, i) => (
-                          <li key={i}>{text}</li>
-                        ))}
+                        {uniqueList.map((text, i) => <li key={i}>{text}</li>)}
                       </ul>
                     </div>
                   );
@@ -237,16 +245,8 @@ export default function Print() {
       {modalOpen && modalDoc && modalVendorDoc && (
         <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-black no-print"
-              onClick={() => setModalOpen(false)}
-            >
-              닫기
-            </button>
-            <h2 className="text-left text-xl font-bold mb-4">
-              거래명세표 ({modalDate})
-            </h2>
-
+            <button className="absolute top-2 right-2 text-gray-500 hover:text-black no-print" onClick={() => setModalOpen(false)}>닫기</button>
+            <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
                 <strong>공급받는자:</strong> {modalDoc.발주처}
@@ -257,15 +257,11 @@ export default function Print() {
               <div>
                 <strong>공급하는자:</strong> {modalVendorDoc.상호명}
                 <p>대표자: {modalVendorDoc.대표자}</p>
-                <p>
-                  사업자등록번호:{" "}
-                  {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}
-                </p>
+                <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
                 <p>대표전화: {modalVendorDoc.대표전화번호}</p>
                 <p>주소: {modalVendorDoc.주소}</p>
               </div>
             </div>
-
             <table className="w-full border-collapse text-sm mb-4">
               <thead>
                 <tr>
@@ -277,24 +273,16 @@ export default function Print() {
               </thead>
               <tbody>
                 {(() => {
-                  const items = modalDoc.품목.filter((it) => it.납품[modalDate]);
-                  const unique = Array.from(
-                    new Map(items.map((it) => [it.식품명, it])).values()
-                  );
+                  const items = modalDoc.품목.filter(it => it.납품[modalDate]);
+                  const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
                   return unique.map((it, idx) => {
                     const d = it.납품[modalDate];
                     return (
                       <tr key={idx}>
                         <td className="border px-2 py-1 text-left">{it.식품명}</td>
-                        <td className="border px-2 py-1 text-left">
-                          {d.수량}
-                        </td>
-                        <td className="border px-2 py-1 text-left">
-                          {d.계약단가}
-                        </td>
-                        <td className="border px-2 py-1 text-left">
-                          {d.공급가액}
-                        </td>
+                        <td className="border px-2 py-1 text-left">{d.수량}</td>
+                        <td className="border px-2 py-1 text-left">{d.계약단가}</td>
+                        <td className="border px-2 py-1 text-left">{d.공급가액}</td>
                       </tr>
                     );
                   });
@@ -302,31 +290,21 @@ export default function Print() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td
-                    colSpan={3}
-                    className="border px-2 py-1 text-left font-bold"
-                  >
-                    합계
-                  </td>
+                  <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
                   <td className="border px-2 py-1 text-left font-bold">
                     {modalDoc.품목
-                      .filter((it) => it.납품[modalDate])
+                      .filter(it => it.납품[modalDate])
                       .reduce((sum, it) => {
                         const d = it.납품[modalDate];
                         return sum + (d.공급가액 || 0);
-                      }, 0)}
+                      }, 0)
+                    }
                   </td>
                 </tr>
               </tfoot>
             </table>
-
             <div className="flex justify-start no-print">
-              <button
-                onClick={doPrint}
-                className="px-4 py-2 bg-blue-500 text-white rounded"
-              >
-                인쇄하기
-              </button>
+              <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">인쇄하기</button>
             </div>
           </div>
         </div>
