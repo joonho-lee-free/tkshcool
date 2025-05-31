@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../../lib/firebase'; // 상대경로로 import 경로 수정
+// 아래 경로를 실제 firebase 설정 파일 위치에 맞게 수정하세요.
+// 예를 들어, 프로젝트 루트에 firebase.ts가 있을 경우: import { db } from '../firebase';
+// lib 폴더 안에 있다면: import { db } from '../../lib/firebase';
+import { db } from '../firebase'; // <-- 여기를 실제 경로로 변경
 
 interface ExcelRow {
   id: string;
@@ -9,7 +12,7 @@ interface ExcelRow {
   식품명: string;
   규격: string;
   속성정보: string;
-  [date: string]: any; // 해당월 일자별 값
+  [date: string]: any;
   총량: number;
   계약단가: number;
   총액: number;
@@ -40,7 +43,7 @@ export default function SchedulePage() {
             식품명: data.식품명,
             규격: data.규격,
             속성정보: data.속성정보,
-            ...data.일자, // 예: { "1일": 값, "2일": 값, ...}
+            ...data.일자,
             총량: data.총량,
             계약단가: data.계약단가,
             총액: totalAmount,
@@ -73,7 +76,6 @@ export default function SchedulePage() {
                 <th className="border border-gray-300 px-4 py-2">식품명</th>
                 <th className="border border-gray-300 px-4 py-2">규격</th>
                 <th className="border border-gray-300 px-4 py-2">속성정보</th>
-                {/* 동적으로 월 일자 컬럼들 출력 */}
                 {Array.from({ length: 30 }, (_, i) => (
                   <th
                     key={`day-${i + 1}`}
@@ -96,13 +98,13 @@ export default function SchedulePage() {
                   <td className="border border-gray-300 px-4 py-2">{row.식품명}</td>
                   <td className="border border-gray-300 px-4 py-2">{row.규격}</td>
                   <td className="border border-gray-300 px-4 py-2">{row.속성정보}</td>
-                  {/* 일자별 데이터 */}
                   {Array.from({ length: 30 }, (_, i) => (
                     <td
                       key={`row-${row.id}-day-${i + 1}`}
                       className="border border-gray-300 px-4 py-2"
                     >
-                      {row[`${i + 1}일`] || '-'}</td>
+                      {row[`${i + 1}일`] || '-'}
+                    </td>
                   ))}
                   <td className="border border-gray-300 px-4 py-2">{row.총량}</td>
                   <td className="border border-gray-300 px-4 py-2">{row.계약단가}</td>
