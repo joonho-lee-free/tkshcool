@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { db } from '@/firebase';
+import { db } from '../lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 interface SchoolDelivery {
@@ -49,7 +49,7 @@ export default function SchedulePage() {
       item.연월 ?? ''
     ]);
     const csvContent = [headers, ...rows]
-      .map(e => e.map(field => `"${field.replace(/"/g, '""')}"`).join(','))
+      .map(e => e.map(field => `"${field.replace(/"/g, '""')}"`).join(',') )
       .join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -89,16 +89,36 @@ export default function SchedulePage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {filteredDeliveries.map(item => (
-              <div key={item.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                <h2 className="text-xl font-medium">{item.발주처}</h2>
-                {item.낙찰기업 && <p>낙찰기업: {item.낙찰기업}</p>}
-                {item.연월 && <p>연월: {item.연월}</p>}
-                {/* 필요한 필드를 여기에 추가 */}
-              </div>
-            ))}
-            {filteredDeliveries.length === 0 && <p>선택된 연월에 해당하는 발주처가 없습니다.</p>}
+          <div className="overflow-x-auto">
+            <table className="table-auto w-full border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border border-gray-300 px-4 py-2 text-left">문서 ID</th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">발주처</th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">낙찰기업</th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">연월</th>
+                  {/* 필요한 다른 헤더 추가 */}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDeliveries.map(item => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="border border-gray-300 px-4 py-2">{item.id}</td>
+                    <td className="border border-gray-300 px-4 py-2">{item.발주처}</td>
+                    <td className="border border-gray-300 px-4 py-2">{item.낙찰기업 || '-'}</td>
+                    <td className="border border-gray-300 px-4 py-2">{item.연월 || '-'}</td>
+                    {/* 필요한 다른 필드 추가 */}
+                  </tr>
+                ))}
+                {filteredDeliveries.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="border border-gray-300 px-4 py-2 text-center">
+                      선택된 연월에 해당하는 발주처가 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </>
       )}
