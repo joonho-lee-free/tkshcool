@@ -9,6 +9,8 @@ import {
   eachDayOfInterval,
   getDay,
   parse,
+  startOfYear,
+  endOfYear,
 } from "date-fns";
 
 // Utility to render kilogram string
@@ -68,6 +70,9 @@ export default function Print() {
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
+  // Year mapping state
+  const [yearMapping, setYearMapping] = useState<string[]>([]);
+
   // Load calendar and vendor dropdown data
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
@@ -104,6 +109,17 @@ export default function Print() {
     });
   }, [selectedYM]);
 
+  // Generate mapping for all dates in 2025
+  useEffect(() => {
+    const startYear = startOfYear(new Date(2025, 0, 1));
+    const endYear = endOfYear(startYear);
+    const allDates = eachDayOfInterval({ start: startYear, end: endYear });
+    const mappings = allDates.map((d) =>
+      `${format(d, "yyyy-MM-dd")} (${format(d, "EEEE")})`
+    );
+    setYearMapping(mappings);
+  }, []);
+
   // Handle click on a school in calendar
   const handleClick = async (school: string, vendor: string, date: string) => {
     setModalDate(date);
@@ -118,15 +134,17 @@ export default function Print() {
 
   const doPrint = () => window.print();
 
-  // Calendar days calculation with full week (Sunday to Saturday)
+  // Calendar days calculation with correct Monday alignment
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const firstOfMonth = parse(`${selectedYM}-01`, "yyyy-MM-dd", now);
   const start = startOfMonth(firstOfMonth);
   const end = endOfMonth(start);
-  const allDays = eachDayOfInterval({ start, end });
-  const dow = getDay(firstOfMonth); // 0=Sun,1=Mon,...
-  const leadingEmpty = Array(dow).fill(null);
+  const allDays = eachDayOfInterval({ start, end }).filter(
+    (d) => getDay(d) >= 1 && getDay(d) <= 5
+  );
+  const dow = getDay(firstOfMonth); // 0=일,1=월...
+  const leadingEmpty = Array(dow === 0 ? 0 : dow - 1).fill(null);
 
   return (
     <>
@@ -165,15 +183,25 @@ export default function Print() {
         </select>
       </div>
 
-      {/* Calendar UI (Sunday to Saturday) */}
+      {/* Year Mapping Display */}
+      <div className="p-4 max-w-screen-xl mx-auto mb-6">
+        <h2 className="text-xl font-bold mb-2">2025년 요일-일자 매핑</h2>
+        <div className="h-64 overflow-y-auto text-sm border rounded p-2">
+          {yearMapping.map((mapStr, idx) => (
+            <div key={idx}>{mapStr}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Calendar UI */}
       <div className="no-print p-4 max-w-screen-xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
-        <div className="grid grid-cols-7 gap-2 text-xs mb-2 text-center font-semibold">
-          {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
+        <div className="grid grid-cols-5 gap-2 text-xs mb-2 text-center font-semibold">
+          {['월','화','수','목','금'].map((d) => (
             <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-2 text-xs">
+        <div className="grid grid-cols-5 gap-2 text-xs">
           {leadingEmpty.map((_, idx) => <div key={idx} />)}
           {allDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
@@ -188,7 +216,7 @@ export default function Print() {
             });
 
             return (
-              <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
+              <div key={dateStr} className="border rounded p-2 min-h-[10rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
                 {Object.entries(grouped).map(([school, lines]) => {
                   const uniqueList = Array.from(
