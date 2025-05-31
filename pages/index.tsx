@@ -32,7 +32,7 @@ type ScheduleObj = {
 type DocData = {
   발주처: string;
   사업자등록번호: string;
-  사업장주소: string;
+  사업장주소: string;      // 새로운 필드: 사업장주소
   대표전화번호: string;
   낙찰기업: string;
   품목: Array<{
@@ -193,7 +193,8 @@ export default function Print() {
           {allDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
             let items = calendarData[dateStr] || [];
-            if (selectedVendor !== '전체') items = items.filter(it => it.낙찰기업 === selectedVendor);
+            if (selectedVendor !== '전체')
+              items = items.filter(it => it.낙찰기업 === selectedVendor);
 
             // Sort by vendor priority
             items.sort((a, b) => {
@@ -254,13 +255,15 @@ export default function Print() {
             <button
               className="absolute top-2 right-2 text-gray-500 hover:text-black no-print"
               onClick={() => setModalOpen(false)}
-            >닫기</button>
+            >
+              닫기
+            </button>
             <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
                 <strong>공급받는자:</strong> {modalDoc.발주처}
                 <p>사업자등록번호: {modalDoc.사업자등록번호}</p>
-                <p>주소: {modalDoc.사업장주소}</p>
+                <p>주소: {modalDoc.사업장주소}</p> {/* 사업장주소 출력 추가 */}
                 <p>대표전화: {modalDoc.대표전화번호}</p>
               </div>
               <div>
@@ -303,14 +306,18 @@ export default function Print() {
                   <td className="border px-2 py-1 text-left font-bold">
                     {modalDoc.품목
                       .filter(it => it.납품[modalDate])
-                      .reduce((sum, it) => { const d = it.납품[modalDate]; return sum + (d.공급가액 || 0); }, 0)
-                    }
+                      .reduce((sum, it) => {
+                        const d = it.납품[modalDate];
+                        return sum + (d.공급가액 || 0);
+                      }, 0)}
                   </td>
                 </tr>
               </tfoot>
             </table>
             <div className="flex justify-start no-print">
-              <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">인쇄하기</button>
+              <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">
+                인쇄하기
+              </button>
             </div>
           </div>
         </div>
