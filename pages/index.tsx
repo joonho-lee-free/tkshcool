@@ -14,6 +14,9 @@ import {
 // Utility to render kilogram string
 const getKg = (수량: number) => `${수량}kg`;
 
+// Priority list for vendors
+const vendorPriority = ["이가에프엔비", "에스에이치유통"];
+
 // Calendar schedule item
 type ScheduleObj = {
   발주처: string;
@@ -100,7 +103,19 @@ export default function Print() {
       });
 
       setCalendarData(temp);
-      setVendors(["전체", ...Array.from(vendorSet)]);
+      // Sort vendors with priority then alphabetically
+      const allVendors = Array.from(vendorSet);
+      allVendors.sort((a, b) => {
+        const ia = vendorPriority.indexOf(a);
+        const ib = vendorPriority.indexOf(b);
+        if (ia !== -1 || ib !== -1) {
+          if (ia === -1) return 1;
+          if (ib === -1) return -1;
+          return ia - ib;
+        }
+        return a.localeCompare(b);
+      });
+      setVendors(["전체", ...allVendors]);
     });
   }, [selectedYM]);
 
@@ -110,7 +125,7 @@ export default function Print() {
     const ymCode = selectedYM.replace("-", "").slice(2);
     const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
     if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
-    // vendor documents are also stored under "school" collection
+    // vendor docs in same collection
     const vendorSnap = await getDoc(doc(db, "school", vendor));
     if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
     setModalOpen(true);
@@ -118,14 +133,14 @@ export default function Print() {
 
   const doPrint = () => window.print();
 
-  // Calendar days calculation with full week (Sunday to Saturday)
+  // Calendar days calculation with full week (Sunday-Saturday)
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const firstOfMonth = parse(`${selectedYM}-01`, "yyyy-MM-dd", now);
   const start = startOfMonth(firstOfMonth);
   const end = endOfMonth(start);
   const allDays = eachDayOfInterval({ start, end });
-  const dow = getDay(firstOfMonth); // 0=Sun,1=Mon,...
+  const dow = getDay(firstOfMonth); // 0=Sun,1=Mon...
   const leadingEmpty = Array(dow).fill(null);
 
   return (
@@ -165,7 +180,7 @@ export default function Print() {
         </select>
       </div>
 
-      {/* Calendar UI (Sunday to Saturday) */}
+      {/* Calendar UI (Sun-Sat) */}
       <div className="no-print p-4 max-w-screen-xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
         <div className="grid grid-cols-7 gap-2 text-xs mb-2 text-center font-semibold">
@@ -178,22 +193,41 @@ export default function Print() {
           {allDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
             let items = calendarData[dateStr] || [];
-            if (selectedVendor !== '전체') {
-              items = items.filter(it => it.낙찰기업 === selectedVendor);
-            }
+            if (selectedVendor !== '전체') items = items.filter(it => it.낙찰기업 === selectedVendor);
 
+            // Sort by vendor priority
+            items.sort((a, b) => {
+              const ia = vendorPriority.indexOf(a.낙찰기업);
+              const ib = vendorPriority.indexOf(b.낙찰기업);
+              if (ia !== -1 || ib !== -1) {
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+              }
+              return 0;
+            });
+
+            // Group by school in priority order
             const grouped: Record<string, ScheduleObj[]> = {};
-            items.forEach(it => {
-              (grouped[it.발주처] ||= []).push(it);
+            items.forEach(it => { (grouped[it.발주처] ||= []).push(it); });
+            const orderedGroups = Object.entries(grouped).sort((a, b) => {
+              const va = a[1][0].낙찰기업;
+              const vb = b[1][0].낙찰기업;
+              const ia = vendorPriority.indexOf(va);
+              const ib = vendorPriority.indexOf(vb);
+              if (ia !== -1 || ib !== -1) {
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+              }
+              return a[0].localeCompare(b[0]);
             });
 
             return (
               <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
-                {Object.entries(grouped).map(([school, lines]) => {
-                  const uniqueList = Array.from(
-                    new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`))
-                  );
+                {orderedGroups.map(([school, lines]) => {
+                  const uniqueList = Array.from(new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`)));
                   return (
                     <div
                       key={school}
@@ -213,11 +247,14 @@ export default function Print() {
         </div>
       </div>
 
-      {/* Modal Overlay for invoice */}
+      {/* Modal Overlay */}
       {modalOpen && modalDoc && modalVendorDoc && (
         <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
-            <button className="absolute top-2 right-2 text-gray-500 hover:text-black no-print" onClick={() => setModalOpen(false)}>닫기</button>
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-black no-print"
+              onClick={() => setModalOpen(false)}
+            >닫기</button>
             <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
@@ -266,10 +303,7 @@ export default function Print() {
                   <td className="border px-2 py-1 text-left font-bold">
                     {modalDoc.품목
                       .filter(it => it.납품[modalDate])
-                      .reduce((sum, it) => {
-                        const d = it.납품[modalDate];
-                        return sum + (d.공급가액 || 0);
-                      }, 0)
+                      .reduce((sum, it) => { const d = it.납품[modalDate]; return sum + (d.공급가액 || 0); }, 0)
                     }
                   </td>
                 </tr>
