@@ -20,8 +20,16 @@ export default function SchedulePage() {
   const [rows, setRows] = useState<ExcelRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const defaultMonth = '2506'; // 이번달(25년06월) 기준으로 고정
-  const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [dateKeys, setDateKeys] = useState<string[]>([]);
+
+  // 현재 시간을 기준으로 YYMM 형식 반환
+  const getCurrentYYMM = () => {
+    const now = new Date();
+    const year = now.getFullYear() % 100;
+    const month = now.getMonth() + 1;
+    return `${year.toString().padStart(2, '0')}${month.toString().padStart(2, '0')}`;
+  };
 
   // Firestore에서 사용 가능한 월을 가져옴
   useEffect(() => {
@@ -36,7 +44,12 @@ export default function SchedulePage() {
         });
         const monthsArray = Array.from(monthsSet).sort();
         setAvailableMonths(monthsArray);
-        if (!monthsArray.includes(defaultMonth) && monthsArray.length > 0) {
+
+        // 기본 연월: 현재 YYMM
+        const defaultMonth = getCurrentYYMM();
+        if (monthsArray.includes(defaultMonth)) {
+          setSelectedMonth(defaultMonth);
+        } else if (monthsArray.length > 0) {
           setSelectedMonth(monthsArray[0]);
         }
       } catch (error) {
@@ -53,7 +66,6 @@ export default function SchedulePage() {
       setLoading(true);
       try {
         const excelCol = collection(db, 'school');
-        // 발주처, 낙찰기업 순으로 정렬
         const q = query(
           excelCol,
           where('연월', '==', selectedMonth),
@@ -62,6 +74,7 @@ export default function SchedulePage() {
         );
         const snapshot = await getDocs(q);
         const tempRows: ExcelRow[] = [];
+        const datesSet = new Set<string>();
         snapshot.docs.forEach(doc => {
           const data = doc.data() as any;
           const 발주처 = data.발주처 || '';
@@ -70,6 +83,7 @@ export default function SchedulePage() {
           if (Array.isArray(deliveries)) {
             deliveries.forEach((entry: any) => {
               const totalAmount = entry.총량 * entry.계약단가;
+              Object.keys(entry.일자 || {}).forEach(date => datesSet.add(date));
               tempRows.push({
                 id: doc.id,
                 발주처,
@@ -87,6 +101,7 @@ export default function SchedulePage() {
           } else if (deliveries && typeof deliveries === 'object') {
             Object.values(deliveries).forEach((entry: any) => {
               const totalAmount = entry.총량 * entry.계약단가;
+              Object.keys(entry.일자 || {}).forEach(date => datesSet.add(date));
               tempRows.push({
                 id: doc.id,
                 발주처,
@@ -103,10 +118,14 @@ export default function SchedulePage() {
             });
           }
         });
+        // 날짜 키 정렬
+        const sortedDates = Array.from(datesSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        setDateKeys(sortedDates);
         setRows(tempRows);
       } catch (error) {
         console.error('데이터 가져오기 실패:', error);
         setRows([]);
+        setDateKeys([]);
       } finally {
         setLoading(false);
       }
@@ -119,7 +138,7 @@ export default function SchedulePage() {
     if (!selectedMonth) return;
     const headers = [
       '문서ID', '발주처', '낙찰기업', 'NO', '식품명', '규격', '속성정보',
-      ...Array.from({ length: 31 }, (_, i) => `${i + 1}일`),
+      ...dateKeys,
       '총량', '계약단가', '총액'
     ];
     const rowsData = rows.map(row => [
@@ -130,7 +149,7 @@ export default function SchedulePage() {
       row.식품명,
       row.규격,
       row.속성정보,
-      ...Array.from({ length: 31 }, (_, i) => row[`${i + 1}일`] || ''),
+      ...dateKeys.map(date => row[date] || ''),
       row.총량,
       row.계약단가,
       row.총액
@@ -186,8 +205,8 @@ export default function SchedulePage() {
                 <th className="border border-gray-300 px-2 py-1">식품명</th>
                 <th className="border border-gray-300 px-2 py-1">규격</th>
                 <th className="border border-gray-300 px-2 py-1">속성정보</th>
-                {Array.from({ length: 31 }, (_, i) => (
-                  <th key={`day-${i + 1}`} className="border border-gray-300 px-2 py-1">{i + 1}일</th>
+                {dateKeys.map(date => (
+                  <th key={date} className="border border-gray-300 px-2 py-1">{date}</th>
                 ))}
                 <th className="border border-gray-300 px-2 py-1">총량</th>
                 <th className="border border-gray-300 px-2 py-1">계약단가</th>
@@ -204,8 +223,8 @@ export default function SchedulePage() {
                   <td className="border border-gray-300 px-2 py-1">{row.식품명}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.규격}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.속성정보}</td>
-                  {Array.from({ length: 31 }, (_, i) => (
-                    <td key={`row-${row.id}-${row.NO}-day-${i + 1}`} className="border border-gray-300 px-2 py-1">{row[`${i + 1}일`] || '-'}</td>
+                  {dateKeys.map(date => (
+                    <td key={`row-${row.id}-${row.NO}-date-${date}`} className="border border-gray-300 px-2 py-1">{row[date] || '-'}</td>
                   ))}
                   <td className="border border-gray-300 px-2 py-1">{row.총량}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.계약단가}</td>
@@ -214,7 +233,7 @@ export default function SchedulePage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={40} className="border border-gray-300 px-2 py-1 text-center">데이터가 없습니다.</td>
+                  <td colSpan={7 + dateKeys.length + 3} className="border border-gray-300 px-2 py-1 text-center">데이터가 없습니다.</td>
                 </tr>
               )}
             </tbody>
