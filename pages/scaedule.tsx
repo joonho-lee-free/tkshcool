@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface ExcelRow {
   id: string;
   발주처: string;
+  낙찰기업: string;
   NO: string;
   식품명: string;
   규격: string;
@@ -22,7 +23,7 @@ export default function SchedulePage() {
   const defaultMonth = '2506'; // 이번달(25년06월) 기준으로 고정
   const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
 
-  // Fetch distinct '연월' values
+  // Firestore에서 사용 가능한 월을 가져옴
   useEffect(() => {
     const fetchMonths = async () => {
       try {
@@ -31,9 +32,7 @@ export default function SchedulePage() {
         const monthsSet = new Set<string>();
         snapshot.docs.forEach(doc => {
           const data = doc.data() as any;
-          if (data.연월) {
-            monthsSet.add(data.연월);
-          }
+          if (data.연월) monthsSet.add(data.연월);
         });
         const monthsArray = Array.from(monthsSet).sort();
         setAvailableMonths(monthsArray);
@@ -47,30 +46,39 @@ export default function SchedulePage() {
     fetchMonths();
   }, []);
 
-  // Fetch rows when selectedMonth changes
+  // 선택한 월에 맞춰 데이터 가져오기
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedMonth) return;
       setLoading(true);
       try {
         const excelCol = collection(db, 'school');
-        const snapshot = await getDocs(query(excelCol, orderBy('발주처', 'asc')));
+        // 발주처, 낙찰기업 순으로 정렬
+        const q = query(
+          excelCol,
+          where('연월', '==', selectedMonth),
+          orderBy('발주처', 'asc'),
+          orderBy('낙찰기업', 'asc')
+        );
+        const snapshot = await getDocs(q);
         const tempRows: ExcelRow[] = [];
         snapshot.docs.forEach(doc => {
           const data = doc.data() as any;
-          if (data.연월 !== selectedMonth) return;
-          const deliveries = data.납품; // 납품 필드 내부 배열 또는 객체
+          const 발주처 = data.발주처 || '';
+          const 낙찰기업 = data.낙찰기업 || '';
+          const deliveries = data.납품;
           if (Array.isArray(deliveries)) {
             deliveries.forEach((entry: any) => {
               const totalAmount = entry.총량 * entry.계약단가;
               tempRows.push({
                 id: doc.id,
-                발주처: data.발주처,
+                발주처,
+                낙찰기업,
                 NO: entry.NO,
                 식품명: entry.식품명,
                 규격: entry.규격,
                 속성정보: entry.속성정보,
-                ...entry.일자, // 일자별 객체
+                ...entry.일자,
                 총량: entry.총량,
                 계약단가: entry.계약단가,
                 총액: totalAmount,
@@ -81,7 +89,8 @@ export default function SchedulePage() {
               const totalAmount = entry.총량 * entry.계약단가;
               tempRows.push({
                 id: doc.id,
-                발주처: data.발주처,
+                발주처,
+                낙찰기업,
                 NO: entry.NO,
                 식품명: entry.식품명,
                 규격: entry.규격,
@@ -105,16 +114,18 @@ export default function SchedulePage() {
     fetchData();
   }, [selectedMonth]);
 
+  // CSV 다운로드 함수
   const downloadCSV = () => {
     if (!selectedMonth) return;
     const headers = [
-      '문서ID', '발주처', 'NO', '식품명', '규격', '속성정보',
+      '문서ID', '발주처', '낙찰기업', 'NO', '식품명', '규격', '속성정보',
       ...Array.from({ length: 31 }, (_, i) => `${i + 1}일`),
       '총량', '계약단가', '총액'
     ];
     const rowsData = rows.map(row => [
       row.id,
       row.발주처,
+      row.낙찰기업,
       row.NO,
       row.식품명,
       row.규격,
@@ -170,6 +181,7 @@ export default function SchedulePage() {
               <tr className="bg-gray-100">
                 <th className="border border-gray-300 px-2 py-1">문서ID</th>
                 <th className="border border-gray-300 px-2 py-1">발주처</th>
+                <th className="border border-gray-300 px-2 py-1">낙찰기업</th>
                 <th className="border border-gray-300 px-2 py-1">NO</th>
                 <th className="border border-gray-300 px-2 py-1">식품명</th>
                 <th className="border border-gray-300 px-2 py-1">규격</th>
@@ -187,6 +199,7 @@ export default function SchedulePage() {
                 <tr key={`${row.id}-${row.NO}`} className="hover:bg-gray-50">
                   <td className="border border-gray-300 px-2 py-1">{row.id}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.발주처}</td>
+                  <td className="border border-gray-300 px-2 py-1">{row.낙찰기업}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.NO}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.식품명}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.규격}</td>
