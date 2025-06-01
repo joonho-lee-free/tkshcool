@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-// 아래 경로를 실제 firebase 설정 파일 위치에 맞게 수정하세요.
-// 예를 들어, 프로젝트 루트에 firebase.ts가 있을 경우: import { db } from '../firebase';
-// lib 폴더 안에 있다면: import { db } from '../../lib/firebase';
-import { db } from './lib/firebase'; // <-- 여기를 실제 경로로 변경
+// lib 폴더 안에 firebase.ts가 위치하므로 아래와 같이 수정합니다:
+import { db } from '../lib/firebase';
 
 interface ExcelRow {
   id: string;
