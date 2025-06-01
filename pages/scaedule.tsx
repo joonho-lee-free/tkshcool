@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface ExcelRow {
   id: string;
+  발주처?: string;
   낙찰기업: string;
   NO: string;
   식품명: string;
@@ -18,8 +19,46 @@ interface ExcelRow {
 export default function SchedulePage() {
   const [rows, setRows] = useState<ExcelRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
 
+  // Helper: get current YYMM format
+  const getCurrentYYMM = () => {
+    const now = new Date();
+    const year = now.getFullYear() % 100;
+    const month = now.getMonth() + 1;
+    return `${year.toString().padStart(2, '0')}${month.toString().padStart(2, '0')}`;
+  };
+
+  // Fetch distinct '연월' values
+  useEffect(() => {
+    const fetchMonths = async () => {
+      try {
+        const excelCol = collection(db, 'school');
+        const snapshot = await getDocs(query(excelCol, orderBy('연월', 'desc')));
+        const monthsSet = new Set<string>();
+        snapshot.docs.forEach(doc => {
+          const data = doc.data() as any;
+          if (data.연월) {
+            monthsSet.add(data.연월);
+          }
+        });
+        const monthsArray = Array.from(monthsSet).sort();
+        setAvailableMonths(monthsArray);
+        const currentYM = getCurrentYYMM();
+        if (monthsArray.includes(currentYM)) {
+          setSelectedMonth(currentYM);
+        } else if (monthsArray.length > 0) {
+          setSelectedMonth(monthsArray[0]);
+        }
+      } catch (error) {
+        console.error('연월 목록 가져오기 실패:', error);
+      }
+    };
+    fetchMonths();
+  }, []);
+
+  // Fetch rows when selectedMonth changes
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedMonth) return;
@@ -28,27 +67,32 @@ export default function SchedulePage() {
         const excelCol = collection(db, 'school');
         const q = query(
           excelCol,
-          where('연월', '==', selectedMonth),
           orderBy('발주처', 'asc')
         );
         const snapshot = await getDocs(q);
-        const fetchedRows: ExcelRow[] = snapshot.docs.map(doc => {
-          const data = doc.data() as any;
-          const totalAmount = data.총량 * data.계약단가;
-          return {
-            id: doc.id,
-            낙찰기업: data.낙찰기업,
-            NO: data.NO,
-            식품명: data.식품명,
-            규격: data.규격,
-            속성정보: data.속성정보,
-            ...data.일자,
-            총량: data.총량,
-            계약단가: data.계약단가,
-            총액: totalAmount,
-          };
-        });
-        setRows(fetchedRows);
+        const filteredRows: ExcelRow[] = snapshot.docs
+          .filter(doc => {
+            const data = doc.data() as any;
+            return data.연월 === selectedMonth;
+          })
+          .map(doc => {
+            const data = doc.data() as any;
+            const totalAmount = data.총량 * data.계약단가;
+            return {
+              id: doc.id,
+              발주처: data.발주처,
+              낙찰기업: data.낙찰기업,
+              NO: data.NO,
+              식품명: data.식품명,
+              규격: data.규격,
+              속성정보: data.속성정보,
+              ...data.일자,
+              총량: data.총량,
+              계약단가: data.계약단가,
+              총액: totalAmount,
+            };
+          });
+        setRows(filteredRows);
       } catch (error) {
         console.error('데이터 가져오기 실패:', error);
         setRows([]);
@@ -56,24 +100,25 @@ export default function SchedulePage() {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [selectedMonth]);
 
   const downloadCSV = () => {
+    if (!selectedMonth) return;
     const headers = [
-      '문서ID', '낙찰기업', 'NO', '식품명', '규격', '속성정보',
-      ...Array.from({ length: 30 }, (_, i) => `${i + 1}일`),
+      '문서ID', '발주처', '낙찰기업', 'NO', '식품명', '규격', '속성정보',
+      ...Array.from({ length: 31 }, (_, i) => `${i + 1}일`),
       '총량', '계약단가', '총액'
     ];
     const rowsData = rows.map(row => [
       row.id,
+      row.발주처 || '',
       row.낙찰기업,
       row.NO,
       row.식품명,
       row.규격,
       row.속성정보,
-      ...Array.from({ length: 30 }, (_, i) => row[`${i + 1}일`] || ''),
+      ...Array.from({ length: 31 }, (_, i) => row[`${i + 1}일`] || ''),
       row.총량,
       row.계약단가,
       row.총액
@@ -102,12 +147,9 @@ export default function SchedulePage() {
           onChange={e => setSelectedMonth(e.target.value)}
           className="border border-gray-300 rounded p-2"
         >
-          <option value="">-- 선택 --</option>
-          <option value="2504">2504</option>
-          <option value="2505">2505</option>
-          <option value="2506">2506</option>
-          <option value="2507">2507</option>
-          {/* 필요에 따라 연월 추가 */}
+          {availableMonths.map(month => (
+            <option key={month} value={month}>{month}</option>
+          ))}
         </select>
         <button
           onClick={downloadCSV}
@@ -121,65 +163,51 @@ export default function SchedulePage() {
       {loading ? (
         <p>로딩 중...</p>
       ) : (
-        selectedMonth ? (
-          <div className="overflow-x-auto">
-            <table className="table-auto w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-300 px-4 py-2">문서ID</th>
-                  <th className="border border-gray-300 px-4 py-2">낙찰기업</th>
-                  <th className="border border-gray-300 px-4 py-2">NO</th>
-                  <th className="border border-gray-300 px-4 py-2">식품명</th>
-                  <th className="border border-gray-300 px-4 py-2">규격</th>
-                  <th className="border border-gray-300 px-4 py-2">속성정보</th>
-                  {Array.from({ length: 30 }, (_, i) => (
-                    <th
-                      key={`day-${i + 1}`}
-                      className="border border-gray-300 px-4 py-2"
-                    >
-                      {i + 1}일
-                    </th>
-                  ))}
-                  <th className="border border-gray-300 px-4 py-2">총량</th>
-                  <th className="border border-gray-300 px-4 py-2">계약단가</th>
-                  <th className="border border-gray-300 px-4 py-2">총액</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(row => (
-                  <tr key={row.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-4 py-2">{row.id}</td>
-                    <td className="border border-gray-300 px-4 py-2">{row.낙찰기업}</td>
-                    <td className="border border-gray-300 px-4 py-2">{row.NO}</td>
-                    <td className="border border-gray-300 px-4 py-2">{row.식품명}</td>
-                    <td className="border border-gray-300 px-4 py-2">{row.규격}</td>
-                    <td className="border border-gray-300 px-4 py-2">{row.속성정보}</td>
-                    {Array.from({ length: 30 }, (_, i) => (
-                      <td
-                        key={`row-${row.id}-day-${i + 1}`}
-                        className="border border-gray-300 px-4 py-2"
-                      >
-                        {row[`${i + 1}일`] || '-'}
-                      </td>
-                    ))}
-                    <td className="border border-gray-300 px-4 py-2">{row.총량}</td>
-                    <td className="border border-gray-300 px-4 py-2">{row.계약단가}</td>
-                    <td className="border border-gray-300 px-4 py-2">{row.총액}</td>
-                  </tr>
+        <div className="overflow-x-auto">
+          <table className="table-auto w-full border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-gray-300 px-4 py-2">문서ID</th>
+                <th className="border border-gray-300 px-4 py-2">발주처</th>
+                <th className="border border-gray-300 px-4 py-2">낙찰기업</th>
+                <th className="border border-gray-300 px-4 py-2">NO</th>
+                <th className="border border-gray-300 px-4 py-2">식품명</th>
+                <th className="border border-gray-300 px-4 py-2">규격</th>
+                <th className="border border-gray-300 px-4 py-2">속성정보</th>
+                {Array.from({ length: 31 }, (_, i) => (
+                  <th key={`day-${i + 1}`} className="border border-gray-300 px-4 py-2">{i + 1}일</th>
                 ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={36} className="border border-gray-300 px-4 py-2 text-center">
-                      데이터가 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p>연월을 선택해주세요.</p>
-        )
+                <th className="border border-gray-300 px-4 py-2">총량</th>
+                <th className="border border-gray-300 px-4 py-2">계약단가</th>
+                <th className="border border-gray-300 px-4 py-2">총액</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(row => (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  <td className="border border-gray-300 px-4 py-2">{row.id}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.발주처}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.낙찰기업}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.NO}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.식품명}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.규격}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.속성정보}</td>
+                  {Array.from({ length: 31 }, (_, i) => (
+                    <td key={`row-${row.id}-day-${i + 1}`} className="border border-gray-300 px-4 py-2">{row[`${i + 1}일`] || '-'}</td>
+                  ))}
+                  <td className="border border-gray-300 px-4 py-2">{row.총량}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.계약단가}</td>
+                  <td className="border border-gray-300 px-4 py-2">{row.총액}</td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={40} className="border border-gray-300 px-4 py-2 text-center">데이터가 없습니다.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
