@@ -50,7 +50,6 @@ export default function SchedulePage() {
     };
     fetchDocs();
   }, []);
-  }, []);
 
   // 선택한 문서ID에 맞춰 데이터 가져오기
   useEffect(() => {
