@@ -62,6 +62,7 @@ export default function SchedulePage() {
         if (!docSnap.exists()) {
           setRows([]);
           setDateKeys([]);
+          setLoading(false);
           return;
         }
         const data = docSnap.data() as any;
@@ -209,12 +210,14 @@ export default function SchedulePage() {
                   {dateKeys.map(date => (
                     <td key={`row-${row.id}-${row.NO}-date-${date}`} className="border border-gray-300 px-2 py-1">{row[date] || '-'}</td>
                   ))}
-                  <td className="border border-gray-300 px-2 py-1">{row.총량}</td>
+                  <td className="border border-gray-303 px-2 py-1">{row.총량}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.계약단가}</td>
                   <td className="border border-gray-300 px-2 py-1">{row.총액}</td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={7 + dateKeys.length + 3} className="border border-gray-300 px-2 py-1 text-center">데이터가 없습니다.</td>
-                ))}
+                </tr>  ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
