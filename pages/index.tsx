@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import {
@@ -30,9 +31,10 @@ type ScheduleObj = {
 
 // Firestore data for school document
 type DocData = {
+  연월: string;
   발주처: string;
   사업자등록번호: string;
-  사업장주소: string;      // 새로운 필드: 사업장주소
+  사업장주소: string;
   대표전화번호: string;
   낙찰기업: string;
   품목: Array<{
@@ -55,7 +57,7 @@ type VendorData = {
 const getColorClass = (vendor: string) =>
   vendor.includes("에스에이치유통") ? "text-blue-600" : "text-gray-700";
 
-export default function Print() {
+export default function Index() {
   const now = new Date();
   const defaultYM = format(now, "yyyy-MM");
   const [selectedYM, setSelectedYM] = useState(defaultYM);
@@ -71,10 +73,11 @@ export default function Print() {
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
-  // Load calendar and vendor dropdown data
+  // Load calendar and vendor dropdown data whenever 연월 changes
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
-    getDocs(collection(db, "school")).then((snap) => {
+    const fetchData = async () => {
+      const snap = await getDocs(collection(db, "school"));
       const temp: Record<string, ScheduleObj[]> = {};
       const vendorSet = new Set<string>();
 
@@ -116,16 +119,16 @@ export default function Print() {
         return a.localeCompare(b);
       });
       setVendors(["전체", ...allVendors]);
-    });
+    };
+    fetchData();
   }, [selectedYM]);
 
-  // Handle click on a school in calendar
+  // Handle click on a school in calendar → open modal
   const handleClick = async (school: string, vendor: string, date: string) => {
     setModalDate(date);
     const ymCode = selectedYM.replace("-", "").slice(2);
     const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
     if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
-    // vendor docs in same collection
     const vendorSnap = await getDoc(doc(db, "school", vendor));
     if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
     setModalOpen(true);
@@ -143,6 +146,13 @@ export default function Print() {
   const dow = getDay(firstOfMonth); // 0=Sun,1=Mon...
   const leadingEmpty = Array(dow).fill(null);
 
+  // Filter items by selectedVendor if not "전체"
+  const getItemsForDate = (dateStr: string) => {
+    let items = calendarData[dateStr] || [];
+    if (selectedVendor !== '전체') items = items.filter(it => it.낙찰기업 === selectedVendor);
+    return items;
+  };
+
   return (
     <>
       <Head>
@@ -158,11 +168,14 @@ export default function Print() {
         `}</style>
       </Head>
 
-      {/* Controls */}
+      {/* Controls: 연월, 발주처 드롭박스, 발주서보기, 인쇄하기 */}
       <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
         <select
           value={selectedYM}
-          onChange={(e) => setSelectedYM(e.target.value)}
+          onChange={(e) => {
+            setSelectedYM(e.target.value);
+            setSelectedVendor('전체');
+          }}
           className="border p-2 rounded"
         >
           {months.map((m) => (
@@ -178,13 +191,24 @@ export default function Print() {
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
+        <Link href={`/scaedule?month=${encodeURIComponent(selectedYM)}&vendor=${encodeURIComponent(selectedVendor)}`}>
+          <button className="px-4 py-2 bg-green-500 text-white rounded cursor-pointer">
+            발주서 보기
+          </button>
+        </Link>
+        <button
+          onClick={doPrint}
+          className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer"
+        >
+          인쇄하기
+        </button>
       </div>
 
       {/* Calendar UI (Sun-Sat) */}
       <div className="no-print p-4 max-w-screen-xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
         <div className="grid grid-cols-7 gap-2 text-xs mb-2 text-center font-semibold">
-          {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
+          {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
             <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>
           ))}
         </div>
@@ -192,11 +216,7 @@ export default function Print() {
           {leadingEmpty.map((_, idx) => <div key={idx} />)}
           {allDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
-            let items = calendarData[dateStr] || [];
-            if (selectedVendor !== '전체')
-              items = items.filter(it => it.낙찰기업 === selectedVendor);
-
-            // Sort by vendor priority
+            const items = getItemsForDate(dateStr);
             items.sort((a, b) => {
               const ia = vendorPriority.indexOf(a.낙찰기업);
               const ib = vendorPriority.indexOf(b.낙찰기업);
@@ -205,25 +225,11 @@ export default function Print() {
                 if (ib === -1) return -1;
                 return ia - ib;
               }
-              return 0;
+              return a.발주처.localeCompare(b.발주처);
             });
-
-            // Group by school in priority order
             const grouped: Record<string, ScheduleObj[]> = {};
             items.forEach(it => { (grouped[it.발주처] ||= []).push(it); });
-            const orderedGroups = Object.entries(grouped).sort((a, b) => {
-              const va = a[1][0].낙찰기업;
-              const vb = b[1][0].낙찰기업;
-              const ia = vendorPriority.indexOf(va);
-              const ib = vendorPriority.indexOf(vb);
-              if (ia !== -1 || ib !== -1) {
-                if (ia === -1) return 1;
-                if (ib === -1) return -1;
-                return ia - ib;
-              }
-              return a[0].localeCompare(b[0]);
-            });
-
+            const orderedGroups = Object.entries(grouped);
             return (
               <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
@@ -263,7 +269,7 @@ export default function Print() {
               <div>
                 <strong>공급받는자:</strong> {modalDoc.발주처}
                 <p>사업자등록번호: {modalDoc.사업자등록번호}</p>
-                <p>주소: {modalDoc.사업장주소}</p> {/* 사업장주소 출력 추가 */}
+                <p>주소: {modalDoc.사업장주소}</p>
                 <p>대표전화: {modalDoc.대표전화번호}</p>
               </div>
               <div>
