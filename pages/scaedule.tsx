@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 interface ExcelRow {
@@ -19,8 +19,8 @@ interface ExcelRow {
 export default function SchedulePage() {
   const [rows, setRows] = useState<ExcelRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [availableDocs, setAvailableDocs] = useState<string[]>([]);
+  const [selectedDoc, setSelectedDoc] = useState<string>('');
   const [dateKeys, setDateKeys] = useState<string[]>([]);
 
   // 현재 시간을 기준으로 YYMM 형식 반환
@@ -31,94 +31,74 @@ export default function SchedulePage() {
     return `${year.toString().padStart(2, '0')}${month.toString().padStart(2, '0')}`;
   };
 
-  // Firestore에서 사용 가능한 월을 가져옴
+  // Firestore에서 문서ID(월_발주처) 목록을 가져옴
   useEffect(() => {
-    const fetchMonths = async () => {
+    const fetchDocs = async () => {
       try {
         const excelCol = collection(db, 'school');
-        const snapshot = await getDocs(query(excelCol, orderBy('연월', 'desc')));
-        const monthsSet = new Set<string>();
-        snapshot.docs.forEach(doc => {
-          const data = doc.data() as any;
-          if (data.연월) monthsSet.add(data.연월);
-        });
-        const monthsArray = Array.from(monthsSet).sort();
-        setAvailableMonths(monthsArray);
-
-        // 기본 연월: 현재 YYMM
-        const defaultMonth = getCurrentYYMM();
-        if (monthsArray.includes(defaultMonth)) {
-          setSelectedMonth(defaultMonth);
-        } else if (monthsArray.length > 0) {
-          setSelectedMonth(monthsArray[0]);
+        const snapshot = await getDocs(excelCol);
+        const allIds = snapshot.docs.map(d => d.id);
+        const currentPrefix = getCurrentYYMM() + '_';
+        const filtered = allIds.filter(id => id.startsWith(currentPrefix)).sort();
+        setAvailableDocs(filtered);
+        if (filtered.length > 0) {
+          setSelectedDoc(filtered[0]);
         }
       } catch (error) {
-        console.error('연월 목록 가져오기 실패:', error);
+        console.error('문서ID 목록 가져오기 실패:', error);
       }
     };
-    fetchMonths();
+    fetchDocs();
   }, []);
 
-  // 선택한 월에 맞춰 데이터 가져오기
+  // 선택한 문서ID에 맞춰 데이터 가져오기
   useEffect(() => {
     const fetchData = async () => {
-      if (!selectedMonth) return;
+      if (!selectedDoc) return;
       setLoading(true);
       try {
-        const excelCol = collection(db, 'school');
-        const q = query(
-          excelCol,
-          where('연월', '==', selectedMonth),
-          orderBy('발주처', 'asc'),
-          orderBy('낙찰기업', 'asc')
-        );
-        const snapshot = await getDocs(q);
+        const docRef = doc(db, 'school', selectedDoc);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          setRows([]);
+          setDateKeys([]);
+          return;
+        }
+        const data = docSnap.data() as any;
+        const 발주처 = data.발주처 || '';
+        const 낙찰기업 = data.낙찰기업 || '';
+        const deliveries = data.납품;
         const tempRows: ExcelRow[] = [];
         const datesSet = new Set<string>();
-        snapshot.docs.forEach(doc => {
-          const data = doc.data() as any;
-          const 발주처 = data.발주처 || '';
-          const 낙찰기업 = data.낙찰기업 || '';
-          const deliveries = data.납품;
-          if (Array.isArray(deliveries)) {
-            deliveries.forEach((entry: any) => {
-              const totalAmount = entry.총량 * entry.계약단가;
-              Object.keys(entry.일자 || {}).forEach(date => datesSet.add(date));
-              tempRows.push({
-                id: doc.id,
-                발주처,
-                낙찰기업,
-                NO: entry.NO,
-                식품명: entry.식품명,
-                규격: entry.규격,
-                속성정보: entry.속성정보,
-                ...entry.일자,
-                총량: entry.총량,
-                계약단가: entry.계약단가,
-                총액: totalAmount,
-              });
+
+        if (Array.isArray(deliveries)) {
+          deliveries.forEach((entry: any) => {
+            const dateObj = entry.납품 || {};
+            Object.keys(dateObj).forEach(date => datesSet.add(date));
+            let 합총량 = 0;
+            let 계약단가 = 0;
+            const rowDates: { [key: string]: any } = {};
+            Object.entries(dateObj).forEach(([date, info]: any) => {
+              rowDates[date] = info.수량 || '-';
+              합총량 += info.수량 || 0;
+              계약단가 = info.계약단가 || 0;
             });
-          } else if (deliveries && typeof deliveries === 'object') {
-            Object.values(deliveries).forEach((entry: any) => {
-              const totalAmount = entry.총량 * entry.계약단가;
-              Object.keys(entry.일자 || {}).forEach(date => datesSet.add(date));
-              tempRows.push({
-                id: doc.id,
-                발주처,
-                낙찰기업,
-                NO: entry.NO,
-                식품명: entry.식품명,
-                규격: entry.규격,
-                속성정보: entry.속성정보,
-                ...entry.일자,
-                총량: entry.총량,
-                계약단가: entry.계약단가,
-                총액: totalAmount,
-              });
+            const 총액 = 합총량 * 계약단가;
+            tempRows.push({
+              id: selectedDoc,
+              발주처,
+              낙찰기업,
+              NO: entry.no || '',
+              식품명: Object.values(dateObj)[0]?.식품명 || '',
+              규격: entry.규격 || '',
+              속성정보: Object.values(dateObj)[0]?.속성정보 || '',
+              ...rowDates,
+              총량: 합총량,
+              계약단가,
+              총액,
             });
-          }
-        });
-        // 날짜 키 정렬
+          });
+        }
         const sortedDates = Array.from(datesSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         setDateKeys(sortedDates);
         setRows(tempRows);
@@ -131,11 +111,11 @@ export default function SchedulePage() {
       }
     };
     fetchData();
-  }, [selectedMonth]);
+  }, [selectedDoc]);
 
   // CSV 다운로드 함수
   const downloadCSV = () => {
-    if (!selectedMonth) return;
+    if (!selectedDoc) return;
     const headers = [
       '문서ID', '발주처', '낙찰기업', 'NO', '식품명', '규격', '속성정보',
       ...dateKeys,
@@ -161,7 +141,7 @@ export default function SchedulePage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `deliveries_${selectedMonth}.csv`);
+    link.setAttribute('download', `${selectedDoc}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -169,23 +149,23 @@ export default function SchedulePage() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold mb-4">월별 납품 현황 (문서ID 기준)</h1>
+      <h1 className="text-xl font-semibold mb-4">문서별 납품 현황</h1>
       <div className="flex items-center mb-4 space-x-4">
-        <label htmlFor="month-select" className="font-medium">연월 선택:</label>
+        <label htmlFor="doc-select" className="font-medium">문서 선택:</label>
         <select
-          id="month-select"
-          value={selectedMonth}
-          onChange={e => setSelectedMonth(e.target.value)}
+          id="doc-select"
+          value={selectedDoc}
+          onChange={e => setSelectedDoc(e.target.value)}
           className="border border-gray-300 rounded p-2 text-sm"
         >
-          {availableMonths.map(month => (
-            <option key={month} value={month}>{month}</option>
+          {availableDocs.map(docId => (
+            <option key={docId} value={docId}>{docId}</option>
           ))}
         </select>
         <button
           onClick={downloadCSV}
-          disabled={!selectedMonth || rows.length === 0}
-          className={`ml-auto px-3 py-1 rounded text-white text-sm ${selectedMonth && rows.length > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'}`}
+          disabled={!selectedDoc || rows.length === 0}
+          className={`ml-auto px-3 py-1 rounded text-white text-sm ${selectedDoc && rows.length > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'}`}
         >
           엑셀 다운로드
         </button>
