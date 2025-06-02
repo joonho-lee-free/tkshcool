@@ -88,9 +88,10 @@ const Schedule: React.FC = () => {
         }
         const parts = d.납품일자.split('-');
         const day = parts[2];
-        grouping[key][day] += d.수량;
-        grouping[key].총량 += d.수량;
-        grouping[key].총합계약단가 = grouping[key].총량 * d.계약단가;
+        // 타입이 string | number 이므로 number로 캐스트 후 더하기
+        grouping[key][day] = (grouping[key][day] as number) + d.수량;
+        grouping[key].총량 = (grouping[key].총량 as number) + d.수량;
+        grouping[key].총합계약단가 = (grouping[key].총량 as number) * d.계약단가;
       });
 
       setRows(Object.values(grouping));
