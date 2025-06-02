@@ -2,13 +2,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 
-# Initialize Firebase Admin SDK (ensure you have your service account JSON)
-# Replace 'path/to/serviceAccount.json' with your actual path
+# Initialize Firebase Admin SDK using the uploaded JSON file
 def initialize_firestore():
     try:
         firebase_admin.get_app()
     except ValueError:
-        cred = credentials.Certificate('path/to/serviceAccount.json')
+        cred = credentials.Certificate('firebase-key.json')
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
@@ -22,39 +21,33 @@ def fetch_school_data():
     for doc in docs:
         doc_id = doc.id
         fields = doc.to_dict()
-        # Extract relevant fields (ensure they exist)
-        brn = fields.get('사업자등록번호', '')
-        ceo = fields.get('대표', '')
-        address = fields.get('사업장주소', '')
-        phone = fields.get('대표전화번호', '')
-        bidder = fields.get('낙찰기업', '')
-        school = fields.get('발주처', '')
-        yyyymm = fields.get('연월', '')
-        item = fields.get('품목', '')
 
         data.append({
             '문서ID': doc_id,
-            '발주처': school,
-            '사업자등록번호': brn,
-            '대표': ceo,
-            '사업장주소': address,
-            '대표전화번호': phone,
-            '낙찰기업': bidder,
-            '연월': yyyymm,
-            '품목': item
+            '연월': fields.get('연월', ''),
+            '발주처': fields.get('발주처', ''),
+            '낙찰기업': fields.get('낙찰기업', ''),
+            'no': fields.get('no', ''),
+            '식품명': fields.get('식품명', ''),
+            '규격': fields.get('규격', ''),
+            '수량': fields.get('수량', ''),
+            '계약단가': fields.get('계약단가', ''),
+            '총합계약단가': fields.get('총합계약단가', ''),
+            '속성정보': fields.get('속성정보', ''),
+            '총량': fields.get('총량', ''),
+            '납품일자': fields.get('납품일자', ''),
+            '계산서번호': fields.get('계산서번호', '')
         })
 
     df = pd.DataFrame(data)
     return df
 
-# Display table grouped by 발주처
+# Display table with a structure similar to schedule.tsx
 
-def display_table_by_school(df):
-    # Sort by 문서ID and 발주처 for readability
-    df_sorted = df.sort_values(['문서ID', '발주처'])
-    # Print full table; you can also pivot or group as needed
+def display_table_by_schedule(df):
+    df_sorted = df.sort_values(['연월', '발주처', 'no'])
     print(df_sorted.to_string(index=False))
 
 if __name__ == '__main__':
     df_school = fetch_school_data()
-    display_table_by_school(df_school)
+    display_table_by_schedule(df_school)
