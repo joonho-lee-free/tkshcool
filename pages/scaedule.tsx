@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { saveAs } from 'file-saver';
 
 interface FirestoreDoc {
   연월: string;
@@ -119,7 +118,12 @@ const Schedule: React.FC = () => {
       .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `${month}-발주서.csv`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${month}-발주서.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
