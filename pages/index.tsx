@@ -134,7 +134,39 @@ export default function Index() {
     setModalOpen(true);
   };
 
-  const doPrint = () => window.print();
+  // Excel download function
+  const handleExcelDownload = () => {
+    // Prepare CSV headers
+    const headers = [
+      '연월', '발주처', '낙찰기업', '날짜', '품목', '수량', '계약단가', '공급가액'
+    ];
+    const rows: (string | number)[][] = [];
+    // Iterate through calendarData to build rows
+    Object.entries(calendarData).forEach(([date, items]) => {
+      items.forEach((it) => {
+        if (selectedVendor !== '전체' && it.낙찰기업 !== selectedVendor) return;
+        const qty = it.수량 === 0 ? '' : it.수량;
+        const price = it.계약단가 === 0 ? '' : it.계약단가;
+        const supply = it.공급가액 === 0 ? '' : it.공급가액;
+        rows.push([
+          selectedYM, it.발주처, it.낙찰기업, it.날짜, it.품목, qty, price, supply
+        ]);
+      });
+    });
+    // Build CSV content with BOM
+    const bom = '\uFEFF';
+    const csvContent = bom + [headers, ...rows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedYM}-${selectedVendor}-발주현황.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Calendar days calculation with full week (Sunday-Saturday)
   const year = +selectedYM.slice(0, 4);
@@ -168,7 +200,7 @@ export default function Index() {
         `}</style>
       </Head>
 
-      {/* Controls: 연월, 발주처 드롭박스, 발주서보기, 인쇄하기 */}
+      {/* Controls: 연월, 발주처 드롭박스, 발주서보기, Excel 다운 */}
       <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
         <select
           value={selectedYM}
@@ -197,10 +229,10 @@ export default function Index() {
           </button>
         </Link>
         <button
-          onClick={doPrint}
+          onClick={handleExcelDownload}
           className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer"
         >
-          인쇄하기
+          Excel 다운
         </button>
       </div>
 
@@ -321,8 +353,8 @@ export default function Index() {
               </tfoot>
             </table>
             <div className="flex justify-start no-print">
-              <button onClick={doPrint} className="px-4 py-2 bg-blue-500 text-white rounded">
-                인쇄하기
+              <button onClick={handleExcelDownload} className="px-4 py-2 bg-blue-500 text-white rounded">
+                Excel 다운로드
               </button>
             </div>
           </div>
