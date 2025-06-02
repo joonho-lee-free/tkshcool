@@ -119,10 +119,10 @@ const Schedule: React.FC = () => {
       r.식품명,
       r.규격,
       r.속성정보,
-      ...dayCols.map((d) => r[d] ?? 0),
-      r.총량,
-      r.계약단가,
-      r.총계약액,
+      ...dayCols.map((d) => (typeof r[d] === 'number' && r[d] === 0 ? '' : r[d])),
+      r.총량 === 0 ? '' : r.총량,
+      r.계약단가 === 0 ? '' : r.계약단가,
+      r.총계약액 === 0 ? '' : r.총계약액,
     ]);
 
     // 한글 깨짐 방지를 위해 BOM(Byte Order Mark) 추가
@@ -165,52 +165,56 @@ const Schedule: React.FC = () => {
 
       <div style={{ overflowX: 'auto' }}>
         <table
-          style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px', whiteSpace: 'nowrap' }}
-          border={1}
-          cellPadding={2}
+          style={{
+            borderCollapse: 'collapse',
+            width: '100%',
+            fontSize: '12px',
+            whiteSpace: 'nowrap',
+            border: '1px solid #ccc',
+          }}
         >
           <thead>
             <tr style={{ backgroundColor: '#e0e0e0' }}>
-              <th>문서ID</th>
-              <th>연월</th>
-              <th>발주처</th>
-              <th>낙찰기업</th>
-              <th>NO</th>
-              <th>식품명</th>
-              <th>규격</th>
-              <th>속성정보</th>
+              <th style={{ border: '1px solid #ccc' }}>문서ID</th>
+              <th style={{ border: '1px solid #ccc' }}>연월</th>
+              <th style={{ border: '1px solid #ccc' }}>발주처</th>
+              <th style={{ border: '1px solid #ccc' }}>낙찰기업</th>
+              <th style={{ border: '1px solid #ccc' }}>NO</th>
+              <th style={{ border: '1px solid #ccc' }}>식품명</th>
+              <th style={{ border: '1px solid #ccc' }}>규격</th>
+              <th style={{ border: '1px solid #ccc' }}>속성정보</th>
               {dayCols.map((day) => (
-                <th key={day}>{day}일</th>
+                <th key={day} style={{ border: '1px solid #ccc' }}>{day}일</th>
               ))}
-              <th>총량</th>
-              <th>계약단가</th>
-              <th>총계약액</th>
+              <th style={{ border: '1px solid #ccc' }}>총량</th>
+              <th style={{ border: '1px solid #ccc' }}>계약단가</th>
+              <th style={{ border: '1px solid #ccc' }}>총계약액</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={8 + dayCols.length + 3} style={{ textAlign: 'center', padding: '16px' }}>
+                <td colSpan={8 + dayCols.length + 3} style={{ textAlign: 'center', padding: '16px', border: '1px solid #ccc' }}>
                   데이터가 없습니다.
                 </td>
               </tr>
             ) : (
               rows.map((r, idx) => (
                 <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fafafa' : '#ffffff' }}>
-                  <td>{r.문서ID}</td>
-                  <td>{r.연월}</td>
-                  <td>{r.발주처}</td>
-                  <td>{r.낙찰기업}</td>
-                  <td>{r.NO}</td>
-                  <td>{r.식품명}</td>
-                  <td>{r.규격}</td>
-                  <td>{r.속성정보}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.문서ID}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.연월}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.발주처}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.낙찰기업}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.NO}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.식품명}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.규격}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.속성정보}</td>
                   {dayCols.map((day) => (
-                    <td key={day}>{r[day] ?? 0}</td>
+                    <td key={day} style={{ border: '1px solid #ccc' }}>{r[day] ? r[day] : ''}</td>
                   ))}
-                  <td>{r.총량}</td>
-                  <td>{r.계약단가}</td>
-                  <td>{r.총계약액}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.총량 ? r.총량 : ''}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.계약단가 ? r.계약단가 : ''}</td>
+                  <td style={{ border: '1px solid #ccc' }}>{r.총계약액 ? r.총계약액 : ''}</td>
                 </tr>
               ))
             )}
