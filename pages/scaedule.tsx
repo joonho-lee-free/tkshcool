@@ -50,7 +50,7 @@ if __name__ == '__main__':
     df_school = fetch_school_data()
     display_table_by_schedule(df_school)
 
-# [schedule.tsx 수정된 부분]
+# schedule.tsx 수정 (기존코드 유지 + 오류수정)
 # csvContent = [headers, ...rowsData]
 #   .map(e => e.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
 #   .join('\n');
