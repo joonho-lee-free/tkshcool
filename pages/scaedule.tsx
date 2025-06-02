@@ -83,15 +83,18 @@ export default function SchedulePage() {
               합총량 += info.수량 || 0;
               계약단가 = info.계약단가 || 0;
             });
+            const totalInfo = (Object.values(dateObj)[0] as any) || {};
+            const 식품명Val = totalInfo.식품명 || '';
+            const 속성정보Val = totalInfo.속성정보 || '';
             const 총액 = 합총량 * 계약단가;
             tempRows.push({
               id: selectedDoc,
               발주처,
               낙찰기업,
               NO: entry.no || '',
-              식품명: Object.values(dateObj)[0]?.식품명 || '',
+              식품명: 식품명Val,
               규격: entry.규격 || '',
-              속성정보: Object.values(dateObj)[0]?.속성정보 || '',
+              속성정보: 속성정보Val,
               ...rowDates,
               총량: 합총량,
               계약단가,
@@ -214,12 +217,4 @@ export default function SchedulePage() {
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={7 + dateKeys.length + 3} className="border border-gray-300 px-2 py-1 text-center">데이터가 없습니다.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
+                ))}
