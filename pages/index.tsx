@@ -199,7 +199,7 @@ export default function Index() {
         ]);
       });
     });
-    const bom = '﻿';
+    const bom = '\uFEFF';
     const csvContent = bom + [headers, ...rows]
       .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
       .join("\n");
@@ -412,7 +412,8 @@ export default function Index() {
                       .filter(it => it.납품[modalDate])
                       .reduce((sum, it) => sum + it.납품[modalDate].공급가액, 0)}
                   </td>
-                </																			</tfoot>
+                </tr>
+              </tfoot>
             </table>
             <div className="flex justify-start no-print">
               <button onClick={() => window.print()} className="px-4 py-2 bg-green-500 text-white rounded">인쇄하기</button>
