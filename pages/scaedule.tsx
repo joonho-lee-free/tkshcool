@@ -125,9 +125,12 @@ const Schedule: React.FC = () => {
       r.총계약액,
     ]);
 
-    const csvContent = [headers, ...data]
-      .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
+    // 한글 깨짐 방지를 위해 BOM(Byte Order Mark) 추가
+    const bom = '\uFEFF';
+    const csvContent = bom +
+      [headers, ...data]
+        .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
