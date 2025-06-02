@@ -22,8 +22,7 @@ interface FirestoreDoc {
   연월: string;
   발주처: string;
   낙찰기업: string;
-  품목: ItemData[]; // upload_school.py 에서 ArrayUnion으로 저장된 배열 구조를 반영합니다 fileciteturn3file5
-  // PDF에서 읽어온 학교 정보
+  품목: ItemData[];
   대표?: string;
   사업자등록번호?: string;
   사업장주소?: string;
@@ -39,7 +38,7 @@ interface RowData {
   식품명: string;
   규격: string;
   속성정보: string;
-  [day: string]: string | number; // '1'부터 '31'
+  [day: string]: string | number;
   총량: number;
   계약단가: number;
   총계약액: number;
@@ -48,6 +47,18 @@ interface RowData {
 const Schedule: React.FC = () => {
   const [month, setMonth] = useState<string>('2025-06');
   const [rows, setRows] = useState<RowData[]>([]);
+
+  // 필터 상태: 각 컬럼별 필터 문자열
+  const [filters, setFilters] = useState<Record<string, string>>({
+    문서ID: '',
+    연월: '',
+    발주처: '',
+    낙찰기업: '',
+    NO: '',
+    식품명: '',
+    규격: '',
+    속성정보: '',
+  });
 
   // 1일부터 31일까지 날짜 컬럼
   const dayCols = Array.from({ length: 31 }).map((_, idx) => (idx + 1).toString());
@@ -62,7 +73,6 @@ const Schedule: React.FC = () => {
         const data = doc.data() as FirestoreDoc;
         const docId = doc.id;
 
-        // Firestore 문서 하나 안에 있는 배열 '품목' 각각을 row로 변환
         data.품목?.forEach((item) => {
           const baseRow: any = {
             문서ID: docId,
@@ -77,14 +87,10 @@ const Schedule: React.FC = () => {
             계약단가: item.단가,
             총계약액: item.총량 * item.단가,
           };
-          // 날짜 컬럼 초기화
           dayCols.forEach((day) => {
             baseRow[day] = 0;
           });
-
-          // 납품 객체에서 날짜별 수량을 해당 컬럼에 입력
           Object.entries(item.납품 || {}).forEach(([dateStr, info]) => {
-            // '2025-06-04' 형태 → 일(day)만 추출
             const parts = dateStr.split('-');
             if (parts.length === 3) {
               const dayNum = parseInt(parts[2], 10).toString();
@@ -93,7 +99,6 @@ const Schedule: React.FC = () => {
               }
             }
           });
-
           tempRows.push(baseRow as RowData);
         });
       });
@@ -103,6 +108,20 @@ const Schedule: React.FC = () => {
     fetchData();
   }, [month]);
 
+  // 필터 입력 변경 핸들러
+  const handleFilterChange = (col: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [col]: value }));
+  };
+
+  // 필터링된 행
+  const filteredRows = rows.filter((r) => {
+    return Object.entries(filters).every(([col, val]) => {
+      if (!val) return true;
+      const cell = r[col] ?? '';
+      return String(cell).toLowerCase().includes(val.toLowerCase());
+    });
+  });
+
   const handleDownload = () => {
     const headers = [
       '문서ID', '연월', '발주처', '낙찰기업', 'NO', '식품명', '규격', '속성정보',
@@ -110,7 +129,7 @@ const Schedule: React.FC = () => {
       '총량', '계약단가', '총계약액',
     ];
 
-    const data: (string | number)[][] = rows.map((r) => [
+    const data: (string | number)[][] = filteredRows.map((r) => [
       r.문서ID,
       r.연월,
       r.발주처,
@@ -125,7 +144,6 @@ const Schedule: React.FC = () => {
       r.총계약액 === 0 ? '' : r.총계약액,
     ]);
 
-    // 한글 깨짐 방지를 위해 BOM(Byte Order Mark) 추가
     const bom = '\uFEFF';
     const csvContent = bom +
       [headers, ...data]
@@ -175,14 +193,87 @@ const Schedule: React.FC = () => {
         >
           <thead>
             <tr style={{ backgroundColor: '#e0e0e0' }}>
-              <th style={{ border: '1px solid #ccc' }}>문서ID</th>
-              <th style={{ border: '1px solid #ccc' }}>연월</th>
-              <th style={{ border: '1px solid #ccc' }}>발주처</th>
-              <th style={{ border: '1px solid #ccc' }}>낙찰기업</th>
-              <th style={{ border: '1px solid #ccc' }}>NO</th>
-              <th style={{ border: '1px solid #ccc' }}>식품명</th>
-              <th style={{ border: '1px solid #ccc' }}>규격</th>
-              <th style={{ border: '1px solid #ccc' }}>속성정보</th>
+              {/* 각 컬럼별 필터 입력 박스 */}
+              <th style={{ border: '1px solid #ccc' }}>
+                문서ID
+                <br />
+                <input
+                  type="text"
+                  value={filters.문서ID}
+                  onChange={(e) => handleFilterChange('문서ID', e.target.value)}
+                  style={{ width: '80px', fontSize: '11px' }}
+                />
+              </th>
+              <th style={{ border: '1px solid #ccc' }}>
+                연월
+                <br />
+                <input
+                  type="text"
+                  value={filters.연월}
+                  onChange={(e) => handleFilterChange('연월', e.target.value)}
+                  style={{ width: '60px', fontSize: '11px' }}
+                />
+              </th>
+              <th style={{ border: '1px solid #ccc' }}>
+                발주처
+                <br />
+                <input
+                  type="text"
+                  value={filters.발주처}
+                  onChange={(e) => handleFilterChange('발주처', e.target.value)}
+                  style={{ width: '100px', fontSize: '11px' }}
+                />
+              </th>
+              <th style={{ border: '1px solid #ccc' }}>
+                낙찰기업
+                <br />
+                <input
+                  type="text"
+                  value={filters.낙찰기업}
+                  onChange={(e) => handleFilterChange('낙찰기업', e.target.value)}
+                  style={{ width: '100px', fontSize: '11px' }}
+                />
+              </th>
+              <th style={{ border: '1px solid #ccc' }}>
+                NO
+                <br />
+                <input
+                  type="text"
+                  value={filters.NO}
+                  onChange={(e) => handleFilterChange('NO', e.target.value)}
+                  style={{ width: '40px', fontSize: '11px' }}
+                />
+              </th>
+              <th style={{ border: '1px solid #ccc' }}>
+                식품명
+                <br />
+                <input
+                  type="text"
+                  value={filters.식품명}
+                  onChange={(e) => handleFilterChange('식품명', e.target.value)}
+                  style={{ width: '120px', fontSize: '11px' }}
+                />
+              </th>
+              <th style={{ border: '1px solid #ccc' }}>
+                규격
+                <br />
+                <input
+                  type="text"
+                  value={filters.규격}
+                  onChange={(e) => handleFilterChange('규격', e.target.value)}
+                  style={{ width: '80px', fontSize: '11px' }}
+                />
+              </th>
+              <th style={{ border: '1px solid #ccc' }}>
+                속성정보
+                <br />
+                <input
+                  type="text"
+                  value={filters.속성정보}
+                  onChange={(e) => handleFilterChange('속성정보', e.target.value)}
+                  style={{ width: '100px', fontSize: '11px' }}
+                />
+              </th>
               {dayCols.map((day) => (
                 <th key={day} style={{ border: '1px solid #ccc' }}>{day}일</th>
               ))}
@@ -192,14 +283,14 @@ const Schedule: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={8 + dayCols.length + 3} style={{ textAlign: 'center', padding: '16px', border: '1px solid #ccc' }}>
                   데이터가 없습니다.
                 </td>
               </tr>
             ) : (
-              rows.map((r, idx) => (
+              filteredRows.map((r, idx) => (
                 <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fafafa' : '#ffffff' }}>
                   <td style={{ border: '1px solid #ccc' }}>{r.문서ID}</td>
                   <td style={{ border: '1px solid #ccc' }}>{r.연월}</td>
