@@ -50,7 +50,7 @@ if __name__ == '__main__':
     df_school = fetch_school_data()
     display_table_by_schedule(df_school)
 
-# schedule.tsx 수정 (기존코드 유지 + 오류수정)
+# schedule.tsx 수정된 코드 (빌드 오류 해결):
 # csvContent = [headers, ...rowsData]
-#   .map(e => e.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
-#   .join('\n');
+#   .map(e => e.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+#   .join("\n"); // 빌드 에러 해결: 닫힘 따옴표 추가
