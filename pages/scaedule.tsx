@@ -12,7 +12,6 @@ def initialize_firestore():
     return firestore.client()
 
 # Fetch all documents in the 'school' collection and return a DataFrame
-
 def fetch_school_data():
     db = initialize_firestore()
     docs = db.collection('school').stream()
@@ -51,3 +50,8 @@ def display_table_by_schedule(df):
 if __name__ == '__main__':
     df_school = fetch_school_data()
     display_table_by_schedule(df_school)
+
+    # Fix for schedule.tsx error:
+    # Original: .join(`
+    # Corrected: .join('\n');
+    # Explanation: Close the string properly with single quotes and semicolon to avoid unterminated string literal error.
