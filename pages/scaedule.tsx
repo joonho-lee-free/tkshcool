@@ -31,24 +31,25 @@ export default function SchedulePage() {
     return `${year.toString().padStart(2, '0')}${month.toString().padStart(2, '0')}`;
   };
 
-  // Firestore에서 문서ID(월_발주처) 목록을 가져옴
+    // Firestore에서 '국제고'가 포함된 모든 문서ID 목록을 가져옴
   useEffect(() => {
     const fetchDocs = async () => {
       try {
         const excelCol = collection(db, 'school');
         const snapshot = await getDocs(excelCol);
         const allIds = snapshot.docs.map(d => d.id);
-        const currentPrefix = getCurrentYYMM() + '_';
-        const filtered = allIds.filter(id => id.startsWith(currentPrefix)).sort();
+        // '국제고'를 포함하는 문서ID만 필터
+        const filtered = allIds.filter(id => id.includes('_국제고')).sort();
         setAvailableDocs(filtered);
         if (filtered.length > 0) {
           setSelectedDoc(filtered[0]);
         }
       } catch (error) {
-        console.error('문서ID 목록 가져오기 실패:', error);
+        console.error('국제고 문서ID 목록 가져오기 실패:', error);
       }
     };
     fetchDocs();
+  }, []);
   }, []);
 
   // 선택한 문서ID에 맞춰 데이터 가져오기
