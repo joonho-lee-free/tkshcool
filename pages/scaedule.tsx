@@ -42,7 +42,6 @@ def fetch_school_data():
     return df
 
 # Display table with a structure similar to schedule.tsx
-
 def display_table_by_schedule(df):
     df_sorted = df.sort_values(['연월', '발주처', 'no'])
     print(df_sorted.to_string(index=False))
@@ -51,7 +50,6 @@ if __name__ == '__main__':
     df_school = fetch_school_data()
     display_table_by_schedule(df_school)
 
-    # Fix for schedule.tsx error:
-    # Original: .join(`
-    # Corrected: .join('\n');
-    # Explanation: Close the string properly with single quotes and semicolon to avoid unterminated string literal error.
+# schedule.tsx 수정: 줄바꿈 문제 수정
+# 수정 전: .join(`
+# 수정 후: .join('\n');
