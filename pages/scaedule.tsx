@@ -50,7 +50,34 @@ if __name__ == '__main__':
     df_school = fetch_school_data()
     display_table_by_schedule(df_school)
 
-# schedule.tsx 수정된 코드 (빌드 오류 해결):
-# csvContent = [headers, ...rowsData]
-#   .map(e => e.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
-#   .join("\n"); // 빌드 에러 해결: 닫힘 따옴표 추가
+// schedule.tsx (Corrected)
+import React from 'react';
+import { saveAs } from 'file-saver';
+
+interface ScheduleProps {
+  headers: string[];
+  rowsData: (string | number)[][];
+}
+
+const Schedule: React.FC<ScheduleProps> = ({ headers, rowsData }) => {
+  const handleDownload = () => {
+    const csvContent = [headers, ...rowsData]
+      .map(e =>
+        e
+          .map(field => `"${String(field).replace(/"/g, '""')}"`)
+          .join(",")
+      )
+      .join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, 'schedule.csv');
+  };
+
+  return (
+    <div>
+      <button onClick={handleDownload}>Download CSV</button>
+      {/* Render your schedule table here */}
+    </div>
+  );
+};
+
+export default Schedule;
