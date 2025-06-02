@@ -15,8 +15,7 @@ import {
 } from "date-fns";
 import {
   onAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut,
   GoogleAuthProvider,
   User,
@@ -75,7 +74,6 @@ export default function Index() {
 
   // Authentication state
   const [user, setUser] = useState<User | null>(null);
-  const [authInitializing, setAuthInitializing] = useState<boolean>(true);
 
   // Calendar data: date → list of schedule items
   const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
@@ -89,29 +87,22 @@ export default function Index() {
 
   // Observe auth state on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (authInitializing) {
-        try {
-          const result = await getRedirectResult(auth);
-          if (result && result.user) {
-            setUser(result.user);
-          }
-        } catch (err) {
-          console.error("getRedirectResult error:", err);
-        }
-      }
-      setAuthInitializing(false);
     });
     return () => unsubscribe();
-  }, [authInitializing]);
+  }, []);
 
-  // Trigger Google login via Redirect
+  // Trigger Google login via Popup
   const handleLogin = () => {
     const provider = new GoogleAuthProvider();
-    signInWithRedirect(auth, provider).catch((error) => {
-      console.error("Login error:", error);
-    });
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        setUser(result.user);
+      })
+      .catch((error) => {
+        console.error("Login error:", error);
+      });
   };
 
   // Trigger sign-out
@@ -227,7 +218,7 @@ export default function Index() {
     return items;
   };
 
-  if (!user && !authInitializing) {
+  if (!user) {
     return (
       <div className="p-4 flex flex-col items-center justify-center h-screen">
         <h2 className="text-xl mb-4">로그인이 필요합니다</h2>
@@ -239,10 +230,6 @@ export default function Index() {
         </button>
       </div>
     );
-  }
-
-  if (!user && authInitializing) {
-    return <div className="p-4 flex flex-col items-center justify-center h-screen">로딩 중...</div>;
   }
 
   return (
@@ -364,63 +351,4 @@ export default function Index() {
       {/* 모달 오버레이 */}
       {modalOpen && modalDoc && modalVendorDoc && (
         <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
-            <button className="absolute top-2 right-2 text-gray-500 hover:text-black no-print" onClick={() => setModalOpen(false)}>닫기</button>
-            <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
-            <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-              <div>
-                <strong>공급받는자:</strong> {modalDoc.발주처}
-                <p>사업자등록번호: {modalDoc.사업자등록번호}</p>
-                <p>주소: {modalDoc.사업장주소}</p>
-                <p>대표전화: {modalDoc.대표전화번호}</p>
-              </div>
-              <div>
-                <strong>공급하는자:</strong> {modalVendorDoc.상호명}
-                <p>대표자: {modalVendorDoc.대표자}</p>
-                <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
-                <p>대표전화: {modalVendorDoc.대표전화번호}</p>
-                <p>주소: {modalVendorDoc.주소}</p>
-              </div>
-            </div>
-            <table className="w-full border-collapse text-sm mb-4">
-              <thead>
-                <tr>
-                  <th className="border px-2 py-1 text-left">품목</th>
-                  <th className="border px-2 py-1 text-left">수량</th>
-                  <th className="border px-2 py-1 text-left">계약단가</th>
-                  <th className="border px-2 py-1 text-left">공급가액</th>
-                </tr>
-              </thead>
-              <tbody>
-                {modalDoc.품목.filter(it => it.납품[modalDate]).map((it, idx) => {
-                  const d = it.납품[modalDate];
-                  return (
-                    <tr key={idx}>
-                      <td className="border px-2 py-1 text-left">{it.식품명}</td>
-                      <td className="border px-2 py-1 text-left">{d.수량}</td>
-                      <td className="border px-2 py-1 text-left">{d.계약단가}</td>
-                      <td className="border px-2 py-1 text-left">{d.공급가액}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
-                  <td className="border px-2 py-1 text-left font-bold">
-                    {modalDoc.품목
-                      .filter(it => it.납품[modalDate])
-                      .reduce((sum, it) => sum + it.납품[modalDate].공급가액, 0)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-            <div className="flex justify-start no-print">
-              <button onClick={() => window.print()} className="px-4 py-2 bg-green-500 text-white rounded">인쇄하기</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+          <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">\
