@@ -1,3 +1,5 @@
+// 파일명: pages/index.tsx
+
 import { useEffect, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
@@ -295,11 +297,11 @@ export default function Index() {
             const orderedGroups = Object.entries(grouped);
             return (
               <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
-                <div className="font-bold mb-1">{format(day, 'd')}</div>
+                <div	className="font-bold mb-1">{format(day, 'd')}</div>
                 {orderedGroups.map(([school, lines]) => {
                   const uniqueList = Array.from(new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`)));
                   return (
-                    <div key={school} onClick={() => handleClick(school.trim(), lines[0].낙찰기업, dateStr)} className={`mb-1 cursor-pointer ${getColorClass(lines[0].낙찰기업)}`}>
+                    <div key={school} onClick={() => handleClick(school.trim(), lines[0].낙찰기업, dateStr)} className={`mb-1	cursor-pointer ${getColorClass(lines[0].낙찰기업)}`}>
                       <span className="font-semibold underline">{school.trim()}</span>
                       <ul className="pl-2 list-disc list-inside">
                         {uniqueList.map((text, i) => (<li key={i}>{text}</li>))}
@@ -318,7 +320,7 @@ export default function Index() {
         <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
             <button className="absolute top-2 right-2 text-gray-500 hover:text-black no-print" onClick={() => setModalOpen(false)}>닫기</button>
-            <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
+            <h2 className="text-left text-xl	font-bold mb-4">거래명세표 ({modalDate})</h2>
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
                 <strong>공급받는자:</strong> {modalDoc.발주처}
@@ -340,7 +342,7 @@ export default function Index() {
                   <th className="border px-2 py-1 text-left">품목</th>
                   <th className="border px-2 py-1 text-left">수량</th>
                   <th className="border px-2 py-1 text-left">계약단가</th>
-                  <th className="border px-2 py-1 text-left">공급가액</th>
+                  <th className="border px-2 py-1	text-left">공급가액</th>
                 </tr>
               </thead>
               <tbody>
@@ -348,21 +350,21 @@ export default function Index() {
                   const d = it.납품[modalDate];
                   return (
                     <tr key={idx}>
-                      <td className="border px-2 py-1 text-left">{it.식품명}</td>
-                      <td className="border px-2 py-1 text-left">{d.수량}</td>
-                      <td className="border px-2 py-1 text-left">{d.계약단가}</td>
-                      <td className="border px-2 py-1 text-left">{d.공급가액}</td>
+                      <td className="border px-2 py-1	text-left">{it.식품명}</td>
+                      <td className="border px-2 py-1	text-left">{d.수량}</td>
+                      <td className="border px-2 py-1	text-left">{d.계약단가}</td>
+                      <td className="border px-2 py-1	text-left">{d.공급가액}</td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
+                  <td colSpan={3} className="border px-2 py-1	text-left font-bold">합계</td>
                   <td className="border px-2 py-1 text-left font-bold">
                     {modalDoc.품목
                       .filter(it => it.납품[modalDate])
-                      .reduce((sum, it) => sum + it.납품[modalDate].공급가액, 0)}
+                      .reduce((sum, it) => sum + it.납품[modalDate].공급가액,	0)}
                   </td>
                 </tr>
               </tfoot>
