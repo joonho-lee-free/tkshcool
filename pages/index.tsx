@@ -4,8 +4,8 @@ import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import Calendar from "./components/calendar";  // 소문자 파일명으로 경로 수정
-import Modal from "./components/modal";        // 소문자 파일명으로 경로 수정
+import Calendar from "./components/calendar";
+import Modal from "./components/modal";
 import { ScheduleObj, DocData, VendorData } from "../types";
 import {
   format,
@@ -15,6 +15,27 @@ import {
   getDay,
   parse,
 } from "date-fns";
+
+// Excel 다운로드 함수 (Modal에서 사용)
+const handleExcelDownload = (modalDate: string, modalDoc: DocData) => {
+  const headers = ['품목', '수량', '계약단가', '공급가액'];
+  const items = modalDoc.품목.filter((it) => it.납품[modalDate]);
+  const dataRows = items.map((it) => {
+    const d = it.납품[modalDate];
+    return [it.식품명, d.수량, d.계약단가, d.공급가액];
+  });
+  const bom = '\uFEFF';
+  const csvContent = bom + [headers, ...dataRows]
+    .map((row) => row.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${modalDate}-거래명세표.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 export default function Index() {
   const now = new Date();
@@ -35,9 +56,9 @@ export default function Index() {
       const temp: Record<string, ScheduleObj[]> = {};
       const vendorSet = new Set<string>();
 
-      snap.docs.forEach((docSnap) => {
+      for (const docSnap of snap.docs) {
         const id = docSnap.id;
-        if (!id.startsWith(ymCode)) return;
+        if (!id.startsWith(ymCode)) continue;
         const data = docSnap.data() as any;
         const school = data.발주처;
         const vendor = data.낙찰기업 || data.납찰기업;
@@ -57,7 +78,7 @@ export default function Index() {
             });
           });
         });
-      });
+      }
 
       setCalendarData(temp);
       const allVendors = Array.from(vendorSet).sort((a, b) => a.localeCompare(b));
@@ -116,6 +137,7 @@ export default function Index() {
           modalDoc={modalDoc}
           modalVendorDoc={modalVendorDoc}
           onClose={() => setModalOpen(false)}
+          handleExcelDownload={() => handleExcelDownload(modalDate, modalDoc!)}
         />
       )}
     </>
