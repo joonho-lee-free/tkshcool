@@ -121,7 +121,6 @@ export default function Index() {
         `}</style>
       </Head>
 
-      {/* Calendar 컴포넌트 */}
       <Calendar
         selectedYM={selectedYM}
         setSelectedYM={setSelectedYM}
@@ -132,7 +131,6 @@ export default function Index() {
         onItemClick={handleClick}
       />
 
-      {/* Modal 컴포넌트 */}
       {modalOpen && modalDoc && modalVendorDoc && (
         <Modal
           modalDate={modalDate}
