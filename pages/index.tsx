@@ -8,7 +8,7 @@ import { db } from "../lib/firebase";
 
 export default function Index(): JSX.Element {
   const now = new Date();
-  const defaultYM = new Date().toISOString().slice(0, 7);
+  const defaultYM = now.toISOString().slice(0, 7);
   const [selectedYM, setSelectedYM] = useState<string>(defaultYM);
   const [selectedVendor, setSelectedVendor] = useState<string>("전체");
 
@@ -22,7 +22,7 @@ export default function Index(): JSX.Element {
 
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
-    const fetchData = async () => {
+    const fetchData = async (): Promise<void> => {
       const snap = await getDocs(collection(db, "school"));
       const temp: Record<string, ScheduleObj[]> = {};
       const vendorSet = new Set<string>();
