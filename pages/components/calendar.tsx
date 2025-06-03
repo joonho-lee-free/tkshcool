@@ -1,6 +1,5 @@
 // 파일 위치: pages/components/Calendar.tsx
 
-import React from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import Link from "next/link";
 // types.ts가 프로젝트 루트에 있으므로 상대경로는 "../../types"입니다
@@ -30,7 +29,6 @@ export default function Calendar({
   vendors,
   onItemClick,
 }: CalendarProps) {
-  const now = new Date();
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const firstOfMonth = new Date(`${selectedYM}-01`);
