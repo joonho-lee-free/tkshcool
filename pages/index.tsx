@@ -1,11 +1,11 @@
-// 파일 위치: pages/index.tsx
+// 파일 위치: /school/pages/index.tsx
 
 import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import Calendar from "./components/calendar";
-import Modal from "./components/modal";
+import Calendar from "../components/Calendar";
+import Modal from "../components/Modal";
 import { ScheduleObj, DocData, VendorData } from "../types";
 import {
   format,
@@ -18,19 +18,21 @@ import {
 
 // Excel 다운로드 함수 (Modal에서 사용)
 const handleExcelDownload = (modalDate: string, modalDoc: DocData) => {
-  const headers = ['품목', '수량', '계약단가', '공급가액'];
+  const headers = ["품목", "수량", "계약단가", "공급가액"];
   const items = modalDoc.품목.filter((it) => it.납품[modalDate]);
   const dataRows = items.map((it) => {
     const d = it.납품[modalDate];
     return [it.식품명, d.수량, d.계약단가, d.공급가액];
   });
-  const bom = '\uFEFF';
-  const csvContent = bom + [headers, ...dataRows]
-    .map((row) => row.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(","))
-    .join("\n");
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const bom = "\uFEFF";
+  const csvContent =
+    bom +
+    [headers, ...dataRows]
+      .map((row) => row.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = `${modalDate}-거래명세표.csv`;
   a.click();
@@ -44,11 +46,14 @@ export default function Index() {
   const [selectedVendor, setSelectedVendor] = useState<string>("전체");
   const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
   const [vendors, setVendors] = useState<string[]>([]);
+
+  // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDoc, setModalDoc] = useState<DocData | null>(null);
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
+  // 연월(selectedYM) 변경 시 calendarData / vendors 가져오기
   useEffect(() => {
     const ymCode = selectedYM.replace("-", "").slice(2);
     const fetchData = async () => {
@@ -84,16 +89,21 @@ export default function Index() {
       const allVendors = Array.from(vendorSet).sort((a, b) => a.localeCompare(b));
       setVendors(["전체", ...allVendors]);
     };
+
     fetchData();
   }, [selectedYM]);
 
+  // Calendar에서 아이템 클릭 시 Modal 열기
   const handleClick = async (school: string, vendor: string, date: string) => {
     setModalDate(date);
     const ymCode = selectedYM.replace("-", "").slice(2);
     const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
     if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
+
+    // vendor 문서도 동일한 컬렉션 아래에 저장되어 있음
     const vendorSnap = await getDoc(doc(db, "school", vendor));
     if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
+
     setModalOpen(true);
   };
 

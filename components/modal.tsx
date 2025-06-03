@@ -1,9 +1,9 @@
-// 파일 위치: pages/components/Modal.tsx
+// 파일 위치: /school/components/Modal.tsx
 
 import React from "react";
-// types.ts가 프로젝트 루트에 있으므로 상대경로는 "../../types"입니다
-import { DocData, VendorData } from "../../types";
+import { DocData, VendorData } from "../types";
 
+// Modal에 필요한 props 정의
 interface ModalProps {
   modalDate: string;
   modalDoc: DocData;
@@ -12,13 +12,13 @@ interface ModalProps {
   handleExcelDownload: () => void;
 }
 
-export default function Modal({
+const Modal: React.FC<ModalProps> = ({
   modalDate,
   modalDoc,
   modalVendorDoc,
   onClose,
   handleExcelDownload,
-}: ModalProps) {
+}) => {
   return (
     <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
@@ -29,6 +29,7 @@ export default function Modal({
           닫기
         </button>
         <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
+
         <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
           <div>
             <strong>공급받는자:</strong> {modalDoc.발주처}
@@ -39,11 +40,15 @@ export default function Modal({
           <div>
             <strong>공급하는자:</strong> {modalVendorDoc.상호명}
             <p>대표자: {modalVendorDoc.대표자}</p>
-            <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
+            <p>
+              사업자등록번호: 
+              {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}
+            </p>
             <p>대표전화: {modalVendorDoc.대표전화번호}</p>
             <p>주소: {modalVendorDoc.주소}</p>
           </div>
         </div>
+
         <table className="w-full border-collapse text-sm mb-4">
           <thead>
             <tr>
@@ -55,8 +60,10 @@ export default function Modal({
           </thead>
           <tbody>
             {(() => {
-              const items = modalDoc.품목.filter(it => it.납품[modalDate]);
-              const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
+              const items = modalDoc.품목.filter((it) => it.납품[modalDate]);
+              const unique = Array.from(
+                new Map(items.map((it) => [it.식품명, it])).values()
+              );
               return unique.map((it, idx) => {
                 const d = it.납품[modalDate];
                 return (
@@ -72,10 +79,12 @@ export default function Modal({
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
+              <td colSpan={3} className="border px-2 py-1 text-left font-bold">
+                합계
+              </td>
               <td className="border px-2 py-1 text-left font-bold">
                 {modalDoc.품목
-                  .filter(it => it.납품[modalDate])
+                  .filter((it) => it.납품[modalDate])
                   .reduce((sum, it) => {
                     const d = it.납품[modalDate];
                     return sum + (d.공급가액 || 0);
@@ -84,12 +93,18 @@ export default function Modal({
             </tr>
           </tfoot>
         </table>
+
         <div className="flex justify-start no-print">
-          <button onClick={handleExcelDownload} className="px-4 py-2 bg-blue-500 text-white rounded">
+          <button
+            onClick={handleExcelDownload}
+            className="px-4 py-2 bg-blue-500 text-white rounded"
+          >
             Excel 다운로드
           </button>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Modal;
