@@ -3,7 +3,6 @@
 import React from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import Link from "next/link";
-
 // types.ts가 프로젝트 루트에 있으므로 상대경로는 "../../types"입니다
 import { ScheduleObj } from "../../types";
 
@@ -85,7 +84,7 @@ export default function Calendar({
         <div className="grid grid-cols-7 gap-2 text-xs">
           {leadingEmpty.map((_, idx) => <div key={idx} />)}
           {allDays.map((day) => {
-            const dateStr = format(day, 'yyyy-MM-dd');
+            const dateStr = format(day, "yyyy-MM-dd");
             const items = getItemsForDate(dateStr);
             items.sort((a, b) => {
               const ia = vendorPriority.indexOf(a.낙찰기업);
@@ -102,7 +101,7 @@ export default function Calendar({
             const orderedGroups = Object.entries(grouped);
             return (
               <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
-                <div className="font-bold mb-1">{format(day, 'd')}</div>
+                <div className="font-bold mb-1">{format(day, "d")}</div>
                 {orderedGroups.map(([school, lines]) => {
                   const uniqueList = Array.from(new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`)));
                   return (
@@ -124,5 +123,104 @@ export default function Calendar({
         </div>
       </div>
     </>
+  );
+}
+
+
+//------------------------------------------------------------
+
+// 파일 위치: pages/components/Modal.tsx
+
+import React from "react";
+// types.ts가 프로젝트 루트에 있으므로 상대경로는 "../../types"입니다
+import { DocData, VendorData } from "../../types";
+
+interface ModalProps {
+  modalDate: string;
+  modalDoc: DocData;
+  modalVendorDoc: VendorData;
+  onClose: () => void;
+  handleExcelDownload: () => void;
+}
+
+export default function Modal({
+  modalDate,
+  modalDoc,
+  modalVendorDoc,
+  onClose,
+  handleExcelDownload,
+}: ModalProps) {
+  return (
+    <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
+        <button
+          className="absolute top-2 right-2 text-gray-500 hover:text-black no-print"
+          onClick={onClose}
+        >
+          닫기
+        </button>
+        <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
+        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+          <div>
+            <strong>공급받는자:</strong> {modalDoc.발주처}
+            <p>사업자등록번호: {modalDoc.사업자등록번호}</p>
+            <p>주소: {modalDoc.사업장주소}</p>
+            <p>대표전화: {modalDoc.대표전화번호}</p>
+          </div>
+          <div>
+            <strong>공급하는자:</strong> {modalVendorDoc.상호명}
+            <p>대표자: {modalVendorDoc.대표자}</p>
+            <p>사업자등록번호: {modalVendorDoc.사업자번호 || modalVendorDoc.사업자등록번호}</p>
+            <p>대표전화: {modalVendorDoc.대표전화번호}</p>
+            <p>주소: {modalVendorDoc.주소}</p>
+          </div>
+        </div>
+        <table className="w-full border-collapse text-sm mb-4">
+          <thead>
+            <tr>
+              <th className="border px-2 py-1 text-left">품목</th>
+              <th className="border px-2 py-1 text-left">수량</th>
+              <th className="border px-2 py-1 text-left">계약단가</th>
+              <th className="border px-2 py-1 text-left">공급가액</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(() => {
+              const items = modalDoc.품목.filter(it => it.납품[modalDate]);
+              const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
+              return unique.map((it, idx) => {
+                const d = it.납품[modalDate];
+                return (
+                  <tr key={idx}>
+                    <td className="border px-2 py-1 text-left">{it.식품명}</td>
+                    <td className="border px-2 py-1 text-left">{d.수량}</td>
+                    <td className="border px-2 py-1 text-left">{d.계약단가}</td>
+                    <td className="border px-2 py-1 text-left">{d.공급가액}</td>
+                  </tr>
+                );
+              });
+            })()}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
+              <td className="border px-2 py-1 text-left font-bold">
+                {modalDoc.품목
+                  .filter(it => it.납품[modalDate])
+                  .reduce((sum, it) => {
+                    const d = it.납품[modalDate];
+                    return sum + (d.공급가액 || 0);
+                  }, 0)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+        <div className="flex justify-start no-print">
+          <button onClick={handleExcelDownload} className="px-4 py-2 bg-blue-500 text-white rounded">
+            Excel 다운로드
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
