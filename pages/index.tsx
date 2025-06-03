@@ -1,11 +1,11 @@
-// 파일 위치: pages/index.tsx
 
+// /pages/index.tsx
 import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import Calendar from "../components/Calendar";
-import Modal from "../components/Modal";
+import Calendar from "../components/calendar";
+import Modal from "../components/modal";
 import { ScheduleObj, DocData, VendorData } from "../types";
 import {
   format,
