@@ -1,7 +1,11 @@
+// 파일 위치: pages/components/Calendar.tsx
+
 import React from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import Link from "next/link";
-import { ScheduleObj } from "../types";
+
+// types.ts가 프로젝트 루트에 있으므로 상대경로는 "../../types"입니다
+import { ScheduleObj } from "../../types";
 
 const getKg = (수량: number) => `${수량}kg`;
 const vendorPriority = ["이가에프엔비", "에스에이치유통"];
@@ -39,7 +43,7 @@ export default function Calendar({
 
   const getItemsForDate = (dateStr: string) => {
     let items = calendarData[dateStr] || [];
-    if (selectedVendor !== '전체') items = items.filter(it => it.낙찰기업 === selectedVendor);
+    if (selectedVendor !== "전체") items = items.filter(it => it.낙찰기업 === selectedVendor);
     return items;
   };
 
@@ -48,7 +52,7 @@ export default function Calendar({
       <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
         <select
           value={selectedYM}
-          onChange={(e) => { setSelectedYM(e.target.value); setSelectedVendor('전체'); }}
+          onChange={(e) => { setSelectedYM(e.target.value); setSelectedVendor("전체"); }}
           className="border p-2 rounded"
         >
           {months.map((m) => (
@@ -70,10 +74,11 @@ export default function Calendar({
           </button>
         </Link>
       </div>
+
       <div className="no-print p-4 max-w-screen-xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
         <div className="grid grid-cols-7 gap-2 text-xs mb-2 text-center font-semibold">
-          {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+          {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
             <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>
           ))}
         </div>
