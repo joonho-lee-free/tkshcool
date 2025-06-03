@@ -1,5 +1,8 @@
+// 파일 위치: pages/components/Modal.tsx
+
 import React from "react";
-import { DocData, VendorData } from "../types";
+// types.ts가 프로젝트 루트에 있으므로 상대경로는 "../../types"입니다
+import { DocData, VendorData } from "../../types";
 
 interface ModalProps {
   modalDate: string;
