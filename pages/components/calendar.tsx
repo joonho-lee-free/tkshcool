@@ -1,6 +1,7 @@
+import React from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import Link from "next/link";
-import { ScheduleObj, DocData, VendorData } from "./Index"; // types 재사용
+import { ScheduleObj } from "../types";
 
 const getKg = (수량: number) => `${수량}kg`;
 const vendorPriority = ["이가에프엔비", "에스에이치유통"];
