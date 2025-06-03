@@ -1,122 +1,122 @@
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
-import Link from "next/link";
-import { ScheduleObj, DocData, VendorData } from "./Index"; // types 재사용
+import { useEffect, useState } from "react";
+import Head from "next/head";
+import Calendar from "./components/Calendar";
+import Modal from "./components/Modal";
+import { ScheduleObj, DocData, VendorData } from "./types";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
-const getKg = (수량: number) => `${수량}kg`;
-const vendorPriority = ["이가에프엔비", "에스에이치유통"];
-const getColorClass = (vendor: string) =>
-  vendor.includes("에스에이치유통") ? "text-blue-600" : "text-gray-700";
-
-interface CalendarProps {
-  selectedYM: string;
-  setSelectedYM: React.Dispatch<React.SetStateAction<string>>;
-  selectedVendor: string;
-  setSelectedVendor: React.Dispatch<React.SetStateAction<string>>;
-  calendarData: Record<string, ScheduleObj[]>;
-  vendors: string[];
-  onItemClick: (school: string, vendor: string, date: string) => void;
-}
-
-export default function Calendar({
-  selectedYM,
-  setSelectedYM,
-  selectedVendor,
-  setSelectedVendor,
-  calendarData,
-  vendors,
-  onItemClick,
-}: CalendarProps) {
+export default function Index(): JSX.Element {
   const now = new Date();
-  const year = +selectedYM.slice(0, 4);
-  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-  const firstOfMonth = new Date(`${selectedYM}-01`);
-  const start = startOfMonth(firstOfMonth);
-  const end = endOfMonth(start);
-  const allDays = eachDayOfInterval({ start, end });
-  const dow = getDay(firstOfMonth);
-  const leadingEmpty = Array(dow).fill(null);
+  const defaultYM = new Date().toISOString().slice(0, 7);
+  const [selectedYM, setSelectedYM] = useState<string>(defaultYM);
+  const [selectedVendor, setSelectedVendor] = useState<string>("전체");
 
-  const getItemsForDate = (dateStr: string) => {
-    let items = calendarData[dateStr] || [];
-    if (selectedVendor !== '전체') items = items.filter(it => it.낙찰기업 === selectedVendor);
-    return items;
+  const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
+  const [vendors, setVendors] = useState<string[]>([]);
+
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [modalDoc, setModalDoc] = useState<DocData | null>(null);
+  const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
+  const [modalDate, setModalDate] = useState<string>("");
+
+  useEffect(() => {
+    const ymCode = selectedYM.replace("-", "").slice(2);
+    const fetchData = async () => {
+      const snap = await getDocs(collection(db, "school"));
+      const temp: Record<string, ScheduleObj[]> = {};
+      const vendorSet = new Set<string>();
+
+      snap.docs.forEach((docSnap) => {
+        const id = docSnap.id;
+        if (!id.startsWith(ymCode)) return;
+        const data = docSnap.data() as any;
+        const school = data.발주처;
+        const vendor = data.낙찰기업 || data.납찰기업;
+        vendorSet.add(vendor);
+
+        (data.품목 || []).forEach((item: any) => {
+          Object.entries(item.납품 || {}).forEach(([date, del]: [string, any]) => {
+            if (!temp[date]) temp[date] = [];
+            temp[date].push({
+              발주처: school,
+              낙찰기업: vendor,
+              날짜: date,
+              품목: item.식품명,
+              수량: del.수량 || 0,
+              계약단가: del.계약단가 || 0,
+              공급가액: del.공급가액 || 0,
+            });
+          });
+        });
+      });
+
+      setCalendarData(temp);
+      const allVendors: string[] = Array.from(vendorSet);
+      allVendors.sort((a, b) => a.localeCompare(b));
+      setVendors(["전체", ...allVendors]);
+    };
+    fetchData();
+  }, [selectedYM]);
+
+  const handleClick = async (school: string, vendor: string, date: string): Promise<void> => {
+    setModalDate(date);
+    const ymCode = selectedYM.replace("-", "").slice(2);
+    const schoolSnap = await getDoc(doc(db, "school", `${ymCode}_${school}`));
+    if (schoolSnap.exists()) setModalDoc(schoolSnap.data() as DocData);
+    const vendorSnap = await getDoc(doc(db, "vendor", vendor));
+    if (vendorSnap.exists()) setModalVendorDoc(vendorSnap.data() as VendorData);
+    setModalOpen(true);
+  };
+
+  const handleExcelDownload = (): void => {
+    const headers: string[] = [
+      '연월', '발주처', '낙찰기업', '날짜', '품목', '수량', '계약단가', '공급가액'
+    ];
+    const rows: (string | number)[][] = [];
+    Object.entries(calendarData).forEach(([date, items]) => {
+      items.forEach((it) => {
+        if (selectedVendor !== '전체' && it.낙찰기업 !== selectedVendor) return;
+        rows.push([
+          selectedYM, it.발주처, it.낙찰기업, it.날짜, it.품목, it.수량, it.계약단가, it.공급가액
+        ]);
+      });
+    });
+    const bom: string = '\uFEFF';
+    const csvContent: string = bom + [headers, ...rows]
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob: Blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url: string = URL.createObjectURL(blob);
+    const a: HTMLAnchorElement = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedYM}-${selectedVendor}-발주현황.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <>
-      <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
-        <select
-          value={selectedYM}
-          onChange={(e) => { setSelectedYM(e.target.value); setSelectedVendor('전체'); }}
-          className="border p-2 rounded"
-        >
-          {months.map((m) => (
-            <option key={m} value={`${year}-${m}`}>{`${year}-${m}`}</option>
-          ))}
-        </select>
-        <select
-          value={selectedVendor}
-          onChange={(e) => setSelectedVendor(e.target.value)}
-          className="border p-2 rounded"
-        >
-          {vendors.map((v) => (
-            <option key={v} value={v}>{v}</option>
-          ))}
-        </select>
-        <Link href={`/scaedule?month=${encodeURIComponent(selectedYM)}&vendor=${encodeURIComponent(selectedVendor)}`}>
-          <button className="px-4 py-2 bg-green-500 text-white rounded cursor-pointer">
-            발주서 보기
-          </button>
-        </Link>
-      </div>
-      <div className="no-print p-4 max-w-screen-xl mx-auto">
-        <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
-        <div className="grid grid-cols-7 gap-2 text-xs mb-2 text-center font-semibold">
-          {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
-            <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-2 text-xs">
-          {leadingEmpty.map((_, idx) => <div key={idx} />)}
-          {allDays.map((day) => {
-            const dateStr = format(day, 'yyyy-MM-dd');
-            const items = getItemsForDate(dateStr);
-            items.sort((a, b) => {
-              const ia = vendorPriority.indexOf(a.낙찰기업);
-              const ib = vendorPriority.indexOf(b.낙찰기업);
-              if (ia !== -1 || ib !== -1) {
-                if (ia === -1) return 1;
-                if (ib === -1) return -1;
-                return ia - ib;
-              }
-              return a.발주처.localeCompare(b.발주처);
-            });
-            const grouped: Record<string, ScheduleObj[]> = {};
-            items.forEach(it => { (grouped[it.발주처] ||= []).push(it); });
-            const orderedGroups = Object.entries(grouped);
-            return (
-              <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
-                <div className="font-bold mb-1">{format(day, 'd')}</div>
-                {orderedGroups.map(([school, lines]) => {
-                  const uniqueList = Array.from(new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`)));
-                  return (
-                    <div
-                      key={school}
-                      onClick={() => onItemClick(school.trim(), lines[0].낙찰기업, dateStr)}
-                      className={`mb-1 cursor-pointer ${getColorClass(lines[0].낙찰기업)}`}
-                    >
-                      <span className="font-semibold underline">{school.trim()}</span>
-                      <ul className="pl-2 list-disc list-inside">
-                        {uniqueList.map((text, i) => <li key={i}>{text}</li>)}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <Head>
+        <title>발주 달력</title>
+      </Head>
+      <Calendar
+        selectedYM={selectedYM}
+        setSelectedYM={setSelectedYM}
+        selectedVendor={selectedVendor}
+        setSelectedVendor={setSelectedVendor}
+        calendarData={calendarData}
+        vendors={vendors}
+        onItemClick={handleClick}
+      />
+      {modalOpen && modalDoc && modalVendorDoc && (
+        <Modal
+          modalDate={modalDate}
+          modalDoc={modalDoc}
+          modalVendorDoc={modalVendorDoc}
+          onClose={() => setModalOpen(false)}
+          handleExcelDownload={handleExcelDownload}
+        />
+      )}
     </>
   );
 }
