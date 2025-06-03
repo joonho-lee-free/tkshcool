@@ -156,8 +156,7 @@ export default function Index() {
     // Build CSV content with BOM
     const bom = '\uFEFF';
     const csvContent = bom + [headers, ...rows]
-      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(",")).join("\n");
     // Download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -200,14 +199,11 @@ export default function Index() {
         `}</style>
       </Head>
 
-      {/* Controls: 연월, 발주처 드롭박스, 발주서보기, Excel 다운 */}
+      {/* Controls: 연월, 발주처 드롭박스, 발주서보기, Excel 다운, 인쇄 */}
       <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
         <select
           value={selectedYM}
-          onChange={(e) => {
-            setSelectedYM(e.target.value);
-            setSelectedVendor('전체');
-          }}
+          onChange={(e) => { setSelectedYM(e.target.value); setSelectedVendor('전체'); }}
           className="border p-2 rounded"
         >
           {months.map((m) => (
@@ -230,9 +226,15 @@ export default function Index() {
         </Link>
         <button
           onClick={handleExcelDownload}
-          className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer"
+          className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mr-2"
         >
           Excel 다운
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="px-4 py-2 bg-green-500 text-white rounded cursor-pointer"
+        >
+          인쇄
         </button>
       </div>
 
@@ -329,37 +331,4 @@ export default function Index() {
                     const d = it.납품[modalDate];
                     return (
                       <tr key={idx}>
-                        <td className="border px-2 py-1 text-left">{it.식품명}</td>
-                        <td className="border px-2 py-1 text-left">{d.수량}</td>
-                        <td className="border px-2 py-1 text-left">{d.계약단가}</td>
-                        <td className="border px-2 py-1 text-left">{d.공급가액}</td>
-                      </tr>
-                    );
-                  });
-                })()}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
-                  <td className="border px-2 py-1 text-left font-bold">
-                    {modalDoc.품목
-                      .filter(it => it.납품[modalDate])
-                      .reduce((sum, it) => {
-                        const d = it.납품[modalDate];
-                        return sum + (d.공급가액 || 0);
-                      }, 0)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-            <div className="flex justify-start no-print">
-              <button onClick={handleExcelDownload} className="px-4 py-2 bg-blue-500 text-white rounded">
-                Excel 다운로드
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+                        <td className="border px-2 py-1 text-left">{it.식품명}</        
