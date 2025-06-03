@@ -4,8 +4,8 @@ import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { db } from "../lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import Calendar from "./components/Calendar";
-import Modal from "./components/Modal";
+import Calendar from "./components/calendar";  // 소문자 파일명으로 경로 수정
+import Modal from "./components/modal";        // 소문자 파일명으로 경로 수정
 import { ScheduleObj, DocData, VendorData } from "../types";
 import {
   format,
@@ -60,8 +60,7 @@ export default function Index() {
       });
 
       setCalendarData(temp);
-      const allVendors = Array.from(vendorSet);
-      allVendors.sort((a, b) => a.localeCompare(b));
+      const allVendors = Array.from(vendorSet).sort((a, b) => a.localeCompare(b));
       setVendors(["전체", ...allVendors]);
     };
     fetchData();
