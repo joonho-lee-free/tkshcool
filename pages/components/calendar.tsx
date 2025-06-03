@@ -1,6 +1,6 @@
 // 파일 위치: pages/components/Calendar.tsx
 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parse } from "date-fns";
 import Link from "next/link";
 // types.ts가 프로젝트 루트에 있으므로 상대경로는 "../../types"입니다
 import { ScheduleObj } from "../../types";
@@ -31,16 +31,18 @@ export default function Calendar({
 }: CalendarProps) {
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-  const firstOfMonth = new Date(`${selectedYM}-01`);
+  const firstOfMonth = parse(`${selectedYM}-01`, "yyyy-MM-dd", new Date());
   const start = startOfMonth(firstOfMonth);
   const end = endOfMonth(start);
+  // 전체(일~토)
   const allDays = eachDayOfInterval({ start, end });
-  const dow = getDay(firstOfMonth);
+  const dow = getDay(firstOfMonth); // 0=Sun,1=Mon...
+  // 일요일부터 시작하도록 leadingEmpty 계산 (Sun=0→0, Mon=1→1, ... Sat=6→6)
   const leadingEmpty = Array(dow).fill(null);
 
   const getItemsForDate = (dateStr: string) => {
     let items = calendarData[dateStr] || [];
-    if (selectedVendor !== "전체") items = items.filter(it => it.낙찰기업 === selectedVendor);
+    if (selectedVendor !== "전체") items = items.filter((it) => it.낙찰기업 === selectedVendor);
     return items;
   };
 
@@ -83,7 +85,8 @@ export default function Calendar({
           {leadingEmpty.map((_, idx) => <div key={idx} />)}
           {allDays.map((day) => {
             const dateStr = format(day, "yyyy-MM-dd");
-            const items = getItemsForDate(dateStr);
+            let items = getItemsForDate(dateStr);
+
             items.sort((a, b) => {
               const ia = vendorPriority.indexOf(a.낙찰기업);
               const ib = vendorPriority.indexOf(b.낙찰기업);
@@ -94,14 +97,17 @@ export default function Calendar({
               }
               return a.발주처.localeCompare(b.발주처);
             });
+
             const grouped: Record<string, ScheduleObj[]> = {};
-            items.forEach(it => { (grouped[it.발주처] ||= []).push(it); });
-            const orderedGroups = Object.entries(grouped);
+            items.forEach((it) => { (grouped[it.발주처] ||= []).push(it); });
+
             return (
               <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, "d")}</div>
-                {orderedGroups.map(([school, lines]) => {
-                  const uniqueList = Array.from(new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`)));
+                {Object.entries(grouped).map(([school, lines]) => {
+                  const uniqueList = Array.from(new Set(
+                    lines.map((l) => `${l.품목} (${getKg(l.수량)})`)
+                  ));
                   return (
                     <div
                       key={school}
