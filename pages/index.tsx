@@ -1,7 +1,9 @@
+// 파일명: pages/index.tsx
+
 import { useEffect, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
-import { db } from "../lib/firebase";
+import { db, auth } from "../lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import {
   format,
@@ -11,6 +13,13 @@ import {
   getDay,
   parse,
 } from "date-fns";
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  GoogleAuthProvider,
+  User,
+} from "firebase/auth";
 
 // Utility to render kilogram string
 const getKg = (수량: number) => `${수량}kg`;
@@ -63,6 +72,9 @@ export default function Index() {
   const [selectedYM, setSelectedYM] = useState(defaultYM);
   const [selectedVendor, setSelectedVendor] = useState<string>("전체");
 
+  // Authentication state
+  const [user, setUser] = useState<User | null>(null);
+
   // Calendar data: date → list of schedule items
   const [calendarData, setCalendarData] = useState<Record<string, ScheduleObj[]>>({});
   const [vendors, setVendors] = useState<string[]>([]);
@@ -73,8 +85,36 @@ export default function Index() {
   const [modalVendorDoc, setModalVendorDoc] = useState<VendorData | null>(null);
   const [modalDate, setModalDate] = useState<string>("");
 
+  // Observe auth state on mount
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Trigger Google login via Popup
+  const handleLogin = () => {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        setUser(result.user);
+      })
+      .catch((error) => {
+        console.error("Login error:", error);
+      });
+  };
+
+  // Trigger sign-out
+  const handleLogout = () => {
+    signOut(auth).catch((error) => {
+      console.error("Logout error:", error);
+    });
+  };
+
   // Load calendar and vendor dropdown data whenever 연월 changes
   useEffect(() => {
+    if (!user) return;
     const ymCode = selectedYM.replace("-", "").slice(2);
     const fetchData = async () => {
       const snap = await getDocs(collection(db, "school"));
@@ -106,7 +146,6 @@ export default function Index() {
       });
 
       setCalendarData(temp);
-      // Sort vendors with priority then alphabetically
       const allVendors = Array.from(vendorSet);
       allVendors.sort((a, b) => {
         const ia = vendorPriority.indexOf(a);
@@ -121,7 +160,7 @@ export default function Index() {
       setVendors(["전체", ...allVendors]);
     };
     fetchData();
-  }, [selectedYM]);
+  }, [selectedYM, user]);
 
   // Handle click on a school in calendar → open modal
   const handleClick = async (school: string, vendor: string, date: string) => {
@@ -136,12 +175,10 @@ export default function Index() {
 
   // Excel download function
   const handleExcelDownload = () => {
-    // Prepare CSV headers
     const headers = [
       '연월', '발주처', '낙찰기업', '날짜', '품목', '수량', '계약단가', '공급가액'
     ];
     const rows: (string | number)[][] = [];
-    // Iterate through calendarData to build rows
     Object.entries(calendarData).forEach(([date, items]) => {
       items.forEach((it) => {
         if (selectedVendor !== '전체' && it.낙찰기업 !== selectedVendor) return;
@@ -153,11 +190,15 @@ export default function Index() {
         ]);
       });
     });
-    // Build CSV content with BOM
     const bom = '\uFEFF';
     const csvContent = bom + [headers, ...rows]
+<<<<<<< HEAD
       .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(",")).join("\n");
     // Download
+=======
+      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+>>>>>>> 8852192d3fde385f6fccbce724593b70e27eda4d
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -167,22 +208,34 @@ export default function Index() {
     URL.revokeObjectURL(url);
   };
 
-  // Calendar days calculation with full week (Sunday-Saturday)
   const year = +selectedYM.slice(0, 4);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const firstOfMonth = parse(`${selectedYM}-01`, "yyyy-MM-dd", now);
   const start = startOfMonth(firstOfMonth);
   const end = endOfMonth(start);
   const allDays = eachDayOfInterval({ start, end });
-  const dow = getDay(firstOfMonth); // 0=Sun,1=Mon...
+  const dow = getDay(firstOfMonth);
   const leadingEmpty = Array(dow).fill(null);
 
-  // Filter items by selectedVendor if not "전체"
   const getItemsForDate = (dateStr: string) => {
     let items = calendarData[dateStr] || [];
     if (selectedVendor !== '전체') items = items.filter(it => it.낙찰기업 === selectedVendor);
     return items;
   };
+
+  if (!user) {
+    return (
+      <div className="p-4 flex flex-col items-center justify-center h-screen">
+        <h2 className="text-xl mb-4">로그인이 필요합니다</h2>
+        <button
+          onClick={handleLogin}
+          className="px-4 py-2 bg-blue-600 text-white rounded"
+        >
+          Google 로그인
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -199,17 +252,26 @@ export default function Index() {
         `}</style>
       </Head>
 
+<<<<<<< HEAD
       {/* Controls: 연월, 발주처 드롭박스, 발주서보기, Excel 다운, 인쇄 */}
       <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
         <select
           value={selectedYM}
           onChange={(e) => { setSelectedYM(e.target.value); setSelectedVendor('전체'); }}
+=======
+      {/* Controls 영역 */}
+      <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4 items-center">
+        <select
+          value={selectedYM}
+          onChange={(e) => { setSelectedYM(e.target.value); setSelectedVendor("전체"); }}
+>>>>>>> 8852192d3fde385f6fccbce724593b70e27eda4d
           className="border p-2 rounded"
         >
           {months.map((m) => (
             <option key={m} value={`${year}-${m}`}>{`${year}-${m}`}</option>
           ))}
         </select>
+
         <select
           value={selectedVendor}
           onChange={(e) => setSelectedVendor(e.target.value)}
@@ -219,35 +281,50 @@ export default function Index() {
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
-        <Link href={`/scaedule?month=${encodeURIComponent(selectedYM)}&vendor=${encodeURIComponent(selectedVendor)}`}>
+
+        <Link
+          href={`/scaedule?month=${encodeURIComponent(
+            selectedYM
+          )}&vendor=${encodeURIComponent(selectedVendor)}`}
+        >
           <button className="px-4 py-2 bg-green-500 text-white rounded cursor-pointer">
             발주서 보기
           </button>
         </Link>
+
         <button
           onClick={handleExcelDownload}
           className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mr-2"
         >
           Excel 다운
         </button>
+<<<<<<< HEAD
         <button
           onClick={() => window.print()}
           className="px-4 py-2 bg-green-500 text-white rounded cursor-pointer"
         >
           인쇄
+=======
+
+        <button
+          onClick={handleLogout}
+          className="ml-auto px-4 py-2 bg-red-500 text-white rounded cursor-pointer"
+        >
+          로그아웃
+>>>>>>> 8852192d3fde385f6fccbce724593b70e27eda4d
         </button>
       </div>
 
-      {/* Calendar UI (Sun-Sat) */}
+      {/* 달력 UI */}
       <div className="no-print p-4 max-w-screen-xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-center">{selectedYM} 발주 달력</h2>
         <div className="grid grid-cols-7 gap-2 text-xs mb-2 text-center font-semibold">
-          {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+          {['일','월','화','수','목','금','토'].map((d) => (
             <div key={d} className="bg-gray-100 py-1 rounded">{d}</div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-2 text-xs">
-          {leadingEmpty.map((_, idx) => <div key={idx} />)}
+          {leadingEmpty.map((_, idx) => (<div key={idx} />))}
           {allDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
             const items = getItemsForDate(dateStr);
@@ -262,22 +339,26 @@ export default function Index() {
               return a.발주처.localeCompare(b.발주처);
             });
             const grouped: Record<string, ScheduleObj[]> = {};
-            items.forEach(it => { (grouped[it.발주처] ||= []).push(it); });
+            items.forEach((it) => { (grouped[it.발주처] ||= []).push(it); });
             const orderedGroups = Object.entries(grouped);
             return (
               <div key={dateStr} className="border rounded p-2 min-h-[8rem] shadow-sm overflow-y-auto">
                 <div className="font-bold mb-1">{format(day, 'd')}</div>
                 {orderedGroups.map(([school, lines]) => {
-                  const uniqueList = Array.from(new Set(lines.map(l => `${l.품목} (${getKg(l.수량)})`)));
+                  const uniqueList = Array.from(new Set(lines.map((l) => `${l.품목} (${getKg(l.수량)})`)));
                   return (
                     <div
                       key={school}
-                      onClick={() => handleClick(school.trim(), lines[0].낙찰기업, dateStr)}
+                      onClick={() => handleClick(
+                        school.trim(),
+                        lines[0].낙찰기업,
+                        dateStr
+                      )}
                       className={`mb-1 cursor-pointer ${getColorClass(lines[0].낙찰기업)}`}
                     >
                       <span className="font-semibold underline">{school.trim()}</span>
                       <ul className="pl-2 list-disc list-inside">
-                        {uniqueList.map((text, i) => <li key={i}>{text}</li>)}
+                        {uniqueList.map((text, i) => (<li key={i}>{text}</li>))}
                       </ul>
                     </div>
                   );
@@ -288,16 +369,11 @@ export default function Index() {
         </div>
       </div>
 
-      {/* Modal Overlay */}
+      {/* 모달 오버레이 */}
       {modalOpen && modalDoc && modalVendorDoc && (
         <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-black no-print"
-              onClick={() => setModalOpen(false)}
-            >
-              닫기
-            </button>
+            <button className="absolute top-2 right-2 text-gray-500 hover:text-black no-print" onClick={() => setModalOpen(false)}>닫기</button>
             <h2 className="text-left text-xl font-bold mb-4">거래명세표 ({modalDate})</h2>
             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
               <div>
@@ -324,6 +400,7 @@ export default function Index() {
                 </tr>
               </thead>
               <tbody>
+<<<<<<< HEAD
                 {(() => {
                   const items = modalDoc.품목.filter(it => it.납품[modalDate]);
                   const unique = Array.from(new Map(items.map(it => [it.식품명, it])).values());
@@ -332,3 +409,37 @@ export default function Index() {
                     return (
                       <tr key={idx}>
                         <td className="border px-2 py-1 text-left">{it.식품명}</        
+=======
+                {modalDoc.품목.filter(it => it.납품[modalDate]).map((it, idx) => {
+                  const d = it.납품[modalDate];
+                  return (
+                    <tr key={idx}>
+                      <td className="border px-2 py-1 text-left">{it.식품명}</td>
+                      <td className="border px-2 py-1 text-left">{d.수량}</td>
+                      <td className="border px-2 py-1 text-left">{d.계약단가}</td>
+                      <td className="border px-2 py-1 text-left">{d.공급가액}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3} className="border px-2 py-1 text-left font-bold">합계</td>
+                  <td className="border px-2 py-1 text-left font-bold">
+                    {modalDoc.품목
+                      .filter(it => it.납품[modalDate])
+                      .reduce((sum, it) => sum + it.납품[modalDate].공급가액, 0)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            <div className="flex justify-start no-print">
+              <button onClick={() => window.print()} className="px-4 py-2 bg-green-500 text-white rounded">인쇄하기</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+>>>>>>> 8852192d3fde385f6fccbce724593b70e27eda4d
