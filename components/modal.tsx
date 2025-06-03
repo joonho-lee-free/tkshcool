@@ -1,5 +1,4 @@
-// 파일 위치: /school/components/Modal.tsx
-
+// /school/components/Modal.tsx
 import React from "react";
 import { DocData, VendorData } from "../types";
 
@@ -100,6 +99,14 @@ const Modal: React.FC<ModalProps> = ({
             className="px-4 py-2 bg-blue-500 text-white rounded"
           >
             Excel 다운로드
+          </button>
+
+          {/* 인쇄하기 버튼 추가 */}
+          <button
+            onClick={() => window.print()}  // 인쇄 대화상자 열기
+            className="px-4 py-2 bg-gray-500 text-white rounded cursor-pointer ml-4"
+          >
+            인쇄하기
           </button>
         </div>
       </div>
