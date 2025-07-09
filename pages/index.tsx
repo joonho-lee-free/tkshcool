@@ -145,4 +145,4 @@ function Index() {
   );
 }
 
-export default withAuth(Index4); // ✅ 로그인 보호 적용
+export default withAuth(Index); // ✅ 로그인 보호 적용
