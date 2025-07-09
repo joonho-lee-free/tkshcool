@@ -1,18 +1,18 @@
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+// utils/firebaseConfig.ts
+import { initializeApp, getApps, getApp } from "firebase/app";
 
+// Firebase 설정 (tkbid.vercel.app과 동일한 tkhealth-30380 프로젝트)
 const firebaseConfig = {
-  apiKey: "AIzaSyBgo9r4epKHiq2CrXpayDtgHB4M_lgzC68",
-  authDomain: "tkhealth-30380.firebaseapp.com",
-  projectId: "tkhealth-30380",
-  storageBucket: "tkhealth-30380.appspot.com", // ✅ 수정
-  messagingSenderId: "692900691095",
-  appId: "1:692900691095:web:babfe553aef6aa4dddfdd2",
-  measurementId: "G-0MYSSGWH84",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!, // 선택사항
 };
 
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// 중복 초기화 방지
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export { app };
-
