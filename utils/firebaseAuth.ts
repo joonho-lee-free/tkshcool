@@ -1,11 +1,8 @@
 import { initializeApp } from "firebase/app";
-import {
-  initializeAuth,
-  browserLocalPersistence,
- } from "firebase/auth";
+import { initializeAuth, browserLocalPersistence } from "firebase/auth";
 
 // 🔧 Firebase 설정 가져오기
-import { firebaseConfig } from "./firebaseConfig";
+import firebaseConfig from "./firebaseConfig";
 
 // ✅ Firebase 앱 초기화
 const firebaseApp = initializeApp(firebaseConfig);
