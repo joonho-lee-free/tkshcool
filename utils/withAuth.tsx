@@ -5,7 +5,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebaseAuth";
 
 export function withAuth<P extends object>(WrappedComponent: React.ComponentType<P>) {
-  const ComponentWithAuth = (props: P): JSX.Element | null => {
+  const ComponentWithAuth = (props: P): React.ReactElement | null => {
     const [user, loading] = useAuthState(auth);
     const router = useRouter();
 
