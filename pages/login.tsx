@@ -25,7 +25,7 @@ export default function LoginPage() {
 
   return (
     <div style={{ padding: 40, maxWidth: 400, margin: "100px auto", border: "1px solid #ccc", borderRadius: 8 }}>
-      <h2 style={{ marginBottom: 20 }}>TKBid 로그인</h2>
+      <h2 style={{ marginBottom: 20 }}>TKshcool 로그인</h2>
       <input
         type="email"
         placeholder="이메일"
