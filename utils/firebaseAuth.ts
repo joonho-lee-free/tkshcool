@@ -1,17 +1,19 @@
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { firebaseApp } from "./firebaseConfig";
+import { initializeApp } from "firebase/app";
+import {
+  initializeAuth,
+  browserLocalPersistence,
+  getReactNativePersistence,
+} from "firebase/auth";
 
-// Firebase 인증 인스턴스 생성
-const auth = getAuth(firebaseApp);
+// 🔧 Firebase 설정 가져오기
+import { firebaseConfig } from "./firebaseConfig";
 
-// ✅ 인증 퍼시스턴스를 로컬 저장소로 설정
-const initAuth = async () => {
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    console.log("✅ Firebase persistence set to browserLocalPersistence");
-  } catch (error) {
-    console.error("🔥 Firebase Auth persistence error:", error);
-  }
-};
+// ✅ Firebase 앱 초기화
+const firebaseApp = initializeApp(firebaseConfig);
 
-export { auth, initAuth };
+// ✅ 인증 인스턴스 생성 (브라우저 로컬에 세션 유지)
+const auth = initializeAuth(firebaseApp, {
+  persistence: browserLocalPersistence,
+});
+
+export { auth };
