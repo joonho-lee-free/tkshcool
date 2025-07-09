@@ -1,8 +1,11 @@
-// pages/login.tsx
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../utils/firebaseAuth"; // ⬅️ 이 파일도 함께 필요합니다
+import {
+  signInWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
+import { auth } from "../utils/firebaseAuth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -13,9 +16,10 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setLoading(true);
     try {
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, pw);
       alert("로그인 성공");
-      router.push("/"); // 로그인 후 메인으로 이동
+      router.push("/");
     } catch (error: any) {
       alert("로그인 실패: " + error.message);
     } finally {
@@ -24,7 +28,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ padding: 40, maxWidth: 400, margin: "100px auto", border: "1px solid #ccc", borderRadius: 8 }}>
+    <div
+      style={{
+        padding: 40,
+        maxWidth: 400,
+        margin: "100px auto",
+        border: "1px solid #ccc",
+        borderRadius: 8,
+      }}
+    >
       <h2 style={{ marginBottom: 20 }}>TKshcool 로그인</h2>
       <input
         type="email"
@@ -43,7 +55,14 @@ export default function LoginPage() {
       <button
         onClick={handleLogin}
         disabled={loading}
-        style={{ width: "100%", padding: 10, background: "#0070f3", color: "white", border: "none", borderRadius: 4 }}
+        style={{
+          width: "100%",
+          padding: 10,
+          background: "#0070f3",
+          color: "white",
+          border: "none",
+          borderRadius: 4,
+        }}
       >
         {loading ? "로그인 중..." : "로그인"}
       </button>
