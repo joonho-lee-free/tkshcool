@@ -1,5 +1,6 @@
 // utils/firebaseConfig.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -10,7 +11,12 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
-// ✅ 중복 방지 + SSR 안전하게 Firebase App 초기화
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+/// ✅ 중복 방지 초기화
+const firebaseApp = getApps().length > 0
+  ? getApp()
+  : initializeApp(firebaseConfig);
 
-export { app };
+const db = getFirestore(firebaseApp);
+
+export { firebaseApp };
+export default db;
