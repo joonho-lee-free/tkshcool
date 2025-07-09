@@ -2,8 +2,7 @@ import { initializeApp } from "firebase/app";
 import {
   initializeAuth,
   browserLocalPersistence,
-  getReactNativePersistence,
-} from "firebase/auth";
+ } from "firebase/auth";
 
 // 🔧 Firebase 설정 가져오기
 import { firebaseConfig } from "./firebaseConfig";
