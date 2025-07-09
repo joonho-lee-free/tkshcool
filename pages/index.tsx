@@ -7,6 +7,7 @@ import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import Calendar from "../components/calendar";
 import Modal from "../components/modal";
 import { ScheduleObj, DocData, VendorData } from "../types";
+import { withAuth } from "../utils/withAuth"; // ✅ 이 줄 추가
 import {
   format,
   startOfMonth,
@@ -37,7 +38,7 @@ const handleExcelDownload = (modalDate: string, modalDoc: DocData) => {
   URL.revokeObjectURL(url);
 };
 
-export default function Index() {
+function Index() {
   const now = new Date();
   const defaultYM = format(now, "yyyy-MM");
   const [selectedYM, setSelectedYM] = useState(defaultYM);
@@ -143,3 +144,5 @@ export default function Index() {
     </>
   );
 }
+
+export default withAuth(Index4); // ✅ 로그인 보호 적용
