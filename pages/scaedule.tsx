@@ -174,6 +174,15 @@ const Schedule: React.FC = () => {
                 </option>
               );
             })}
+              {Array.from({ length: 12 }).map((_, idx) => {
+               const m = (idx + 1).toString().padStart(2, '0');
+              return (
+               <option key={`2026-${m}`} value={`2026-${m}`}>
+                  2026-{m}
+                </option>
+              );
+            })}
+            
           </select>
         </label>
         <button onClick={handleDownload} style={{ padding: '4px 8px', fontSize: '12px' }}>
