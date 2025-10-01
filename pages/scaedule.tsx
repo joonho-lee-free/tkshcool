@@ -162,24 +162,26 @@ const Schedule: React.FC = () => {
   return (
     <div style={{ padding: 10, fontSize: '12px' }}>
       <h2 style={{ fontSize: '16px' }}>월별 납품 현황 (문서ID 기준)</h2>
-      
+
       <div style={{ marginBottom: 8 }}>
         <label style={{ marginRight: 8 }}>
           연월 선택:&nbsp;
           <select value={month} onChange={(e) => setMonth(e.target.value)}>
             {Array.from({ length: 12 }).map((_, idx) => {
               const m = (idx + 1).toString().padStart(2, '0');
+              const ym = `2025-${m}`;
               return (
-                <option key={m} value={`2025-${m}`}>
-                  2025-{m}
+                <option key={ym} value={ym}>
+                 {ym}
                 </option>
               );
             })}
               {Array.from({ length: 12 }).map((_, idx) => {
                const m = (idx + 1).toString().padStart(2, '0');
+               const ym = `2026-${m}`;
               return (
-               <option key={`2026-${m}`} value={`2026-${m}`}>
-                  2026-{m}
+               <option key={ym} value={ym}>
+                  {ym}
                 </option>
               );
             })}
