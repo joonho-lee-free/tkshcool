@@ -30,7 +30,7 @@ const Calendar: React.FC<CalendarProps> = ({
   onItemClick,
 }) => {
   const now = new Date();
-  const year = +selectedYM.slice(0, 4);
+  const years = ["2025", "2026"]; // 필요시 2027, 2028 계속 추가
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const firstOfMonth = new Date(`${selectedYM}-01`);
   const start = startOfMonth(firstOfMonth);
@@ -59,11 +59,16 @@ const Calendar: React.FC<CalendarProps> = ({
           }}
           className="border p-2 rounded"
         >
-          {months.map((m) => (
-            <option key={m} value={`${year}-${m}`}>
-              {`${year}-${m}`}
+          {years.flatMap((y) =>
+            months.map((m) => {
+              const ym = `${y}-${m}`;
+              return (
+               <option key={ym} value={ym}>
+                {ym}
             </option>
-          ))}
+            );
+          })
+        )}
         </select>
 
         <select
