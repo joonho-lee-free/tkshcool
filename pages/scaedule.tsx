@@ -162,6 +162,7 @@ const Schedule: React.FC = () => {
   return (
     <div style={{ padding: 10, fontSize: '12px' }}>
       <h2 style={{ fontSize: '16px' }}>월별 납품 현황 (문서ID 기준)</h2>
+      
       <div style={{ marginBottom: 8 }}>
         <label style={{ marginRight: 8 }}>
           연월 선택:&nbsp;
@@ -182,9 +183,9 @@ const Schedule: React.FC = () => {
                 </option>
               );
             })}
-            
-          </select>
+         </select>
         </label>
+
         <button onClick={handleDownload} style={{ padding: '4px 8px', fontSize: '12px' }}>
           엑셀 다운로드
         </button>
