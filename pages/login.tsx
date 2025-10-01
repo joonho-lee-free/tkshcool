@@ -5,7 +5,7 @@ import {
   setPersistence,
   browserLocalPersistence,
 } from "firebase/auth";
-import { auth } from "../utils/firebaseAuth";
+import auth from "../utils/firebaseAuth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
