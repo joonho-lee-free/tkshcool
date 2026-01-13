@@ -1,8 +1,14 @@
 {
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
   "dependencies": {
     "date-fns": "^4.1.0",
     "firebase": "^11.7.3",
-    "next": "^15.3.2",
+    "next": "15.3.8",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-firebase-hooks": "^5.1.1",
