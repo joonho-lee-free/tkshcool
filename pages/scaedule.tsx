@@ -45,7 +45,7 @@ interface RowData {
 }
 
 const Schedule: React.FC = () => {
-  const [month, setMonth] = useState<string>('2025-06');
+  const [month, setMonth] = useState<string>(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
   const [rows, setRows] = useState<RowData[]>([]);
 
   // 필터 상태: 각 컬럼별 필터 문자열
