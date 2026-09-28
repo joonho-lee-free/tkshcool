@@ -1,5 +1,6 @@
 // /school/components/Modal.tsx
 import React from "react";
+import Head from "next/head";
 import { DocData, VendorData } from "../types";
 
 // Modal에 필요한 props 정의
@@ -22,21 +23,19 @@ const Modal: React.FC<ModalProps> = ({
   const stampUrl =
     (modalVendorDoc as VendorData & { 도장?: string }).도장 || "";
 
+  const printTitle = `${modalDoc.발주처}(${modalDate})`;
+
   const handlePrint = () => {
-    const originalTitle = document.title;
-    document.title = `${modalDoc.발주처}_${modalDate}`;
-
-    const restoreTitle = () => {
-      document.title = originalTitle;
-      window.removeEventListener("afterprint", restoreTitle);
-    };
-
-    window.addEventListener("afterprint", restoreTitle);
+    document.title = printTitle;
     window.print();
   };
 
   return (
-    <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+    <>
+      <Head>
+        <title>{printTitle}</title>
+      </Head>
+      <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
         <button
           className="absolute top-2 right-2 text-gray-500 hover:text-black no-print"
@@ -182,6 +181,7 @@ const Modal: React.FC<ModalProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 
