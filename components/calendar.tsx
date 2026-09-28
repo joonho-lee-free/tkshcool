@@ -42,10 +42,22 @@ const Calendar: React.FC<CalendarProps> = ({
   onItemClick,
 }) => {
   const now = new Date();
-  const years = ["2025", "2026"]; // 필요시 2027, 2028 계속 추가
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+
+  const [selectedYear = String(currentYear), selectedMonth = currentMonth] =
+    selectedYM.split("-");
+
+  const startYear = 2024;
+  const endYear = 2030;
+  const years = Array.from(
+    { length: endYear - startYear + 1 },
+    (_, i) => String(startYear + i)
+  );
   const months = Array.from({ length: 12 }, (_, i) =>
     String(i + 1).padStart(2, "0")
   );
+
   const firstOfMonth = new Date(`${selectedYM}-01`);
   const start = startOfMonth(firstOfMonth);
   const end = endOfMonth(start);
@@ -63,26 +75,40 @@ const Calendar: React.FC<CalendarProps> = ({
 
   return (
     <>
-      {/* Controls: 연월, 발주처 드롭박스, 발주서보기 */}
-      <div className="no-print p-4 max-w-screen-xl mx-auto flex gap-4">
+      {/* Controls: 연도, 월, 발주처 드롭박스, 발주서보기 */}
+      <div className="no-print p-4 max-w-screen-xl mx-auto flex flex-row items-center gap-2">
+        {/* 연도 선택 */}
         <select
-          value={selectedYM}
+          value={selectedYear}
           onChange={(e) => {
-            setSelectedYM(e.target.value);
+            const newYM = `${e.target.value}-${selectedMonth}`;
+            setSelectedYM(newYM);
             setSelectedVendor("전체");
           }}
           className="border p-2 rounded"
         >
-          {years.flatMap((y) =>
-            months.map((m) => {
-              const ym = `${y}-${m}`;
-              return (
-                <option key={ym} value={ym}>
-                  {ym}
-                </option>
-              );
-            })
-          )}
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}년
+            </option>
+          ))}
+        </select>
+
+        {/* 월 선택 */}
+        <select
+          value={selectedMonth}
+          onChange={(e) => {
+            const newYM = `${selectedYear}-${e.target.value}`;
+            setSelectedYM(newYM);
+            setSelectedVendor("전체");
+          }}
+          className="border p-2 rounded"
+        >
+          {months.map((m) => (
+            <option key={m} value={m}>
+              {parseInt(m, 10)}월
+            </option>
+          ))}
         </select>
 
         <select

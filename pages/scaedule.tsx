@@ -252,24 +252,17 @@ const Schedule: React.FC = () => {
             value={month}
             onChange={(e) => handleMonthChange(e.target.value)}
           >
-            {Array.from({ length: 12 }).map((_, idx) => {
-              const m = (idx + 1).toString().padStart(2, "0");
-              const ym = `2025-${m}`;
-              return (
-                <option key={ym} value={ym}>
-                  {ym}
-                </option>
-              );
-            })}
-            {Array.from({ length: 12 }).map((_, idx) => {
-              const m = (idx + 1).toString().padStart(2, "0");
-              const ym = `2026-${m}`;
-              return (
-                <option key={ym} value={ym}>
-                  {ym}
-                </option>
-              );
-            })}
+            {Array.from({ length: 2030 - 2024 + 1 }, (_, i) => 2024 + i).flatMap((y) =>
+              Array.from({ length: 12 }, (_, idx) => {
+                const m = (idx + 1).toString().padStart(2, "0");
+                const ym = `${y}-${m}`;
+                return (
+                  <option key={ym} value={ym}>
+                    {ym}
+                  </option>
+                );
+              })
+            )}
           </select>
         </label>
 
