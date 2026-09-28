@@ -22,6 +22,19 @@ const Modal: React.FC<ModalProps> = ({
   const stampUrl =
     (modalVendorDoc as VendorData & { 도장?: string }).도장 || "";
 
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    document.title = `${modalDoc.발주처}_${modalDate}`;
+
+    const restoreTitle = () => {
+      document.title = originalTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    window.addEventListener("afterprint", restoreTitle);
+    window.print();
+  };
+
   return (
     <div className="modal-overlay fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="modal-container bg-white w-full max-w-screen-md p-6 rounded shadow-lg relative page-break">
@@ -161,7 +174,7 @@ const Modal: React.FC<ModalProps> = ({
 
           {/* 인쇄하기 버튼 추가 */}
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="px-4 py-2 bg-gray-500 text-white rounded cursor-pointer ml-4"
           >
             인쇄하기
