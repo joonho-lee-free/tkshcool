@@ -23,11 +23,33 @@ const Modal: React.FC<ModalProps> = ({
   const stampUrl =
     (modalVendorDoc as VendorData & { 도장?: string }).도장 || "";
 
-  const printTitle = `${modalDoc.발주처}(${modalDate})`;
+  const currentSchoolName = modalDoc.발주처 ? modalDoc.발주처.trim() : "";
+  const printTitle = `${currentSchoolName}(${modalDate})`;
 
   const handlePrint = () => {
+    // 1. 기존 타이틀 백업
+    const originalTitle = document.title;
+
+    // 2. 파일명용 타이틀 생성 (예: 성동중(2026-10-20))
     document.title = printTitle;
+
+    // 3. 복원 함수 정의 및 afterprint 이벤트 등록
+    let restored = false;
+    const restoreTitle = () => {
+      if (!restored) {
+        restored = true;
+        document.title = originalTitle;
+        window.removeEventListener("afterprint", restoreTitle);
+      }
+    };
+
+    window.addEventListener("afterprint", restoreTitle);
+
+    // 4. 인쇄 다이얼로그 호출
     window.print();
+
+    // 5. 호환성을 위한 원복 타이머
+    setTimeout(restoreTitle, 1000);
   };
 
   return (
