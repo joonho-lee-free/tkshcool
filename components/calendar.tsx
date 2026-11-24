@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 import Link from "next/link";
 import { ScheduleObj } from "../types";
+import StatementExport from "./StatementExport";
 
 const getKg = (수량: number) => `${수량}kg`;
 
@@ -132,6 +133,9 @@ const Calendar: React.FC<CalendarProps> = ({
             발주서 보기
           </button>
         </Link>
+
+        {/* 고른 달의 학교별 거래명세표 → output 폴더에 학교마다 zip */}
+        <StatementExport selectedYM={selectedYM} selectedVendor={selectedVendor} />
       </div>
 
       {/* Calendar UI (Sun-Sat) */}
