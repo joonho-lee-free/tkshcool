@@ -59,11 +59,12 @@ const won = (v: number) => (Number(v) || 0).toLocaleString();
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 const safeName = (s: string) => s.replace(/[\\/:*?"<>|]/g, "").trim();
 
-// 도장 그림을 미리 data URL 로 (다른 주소 그림은 PDF 그릴 때 막히는 경우가 있어서)
+// 도장 그림을 미리 data URL 로 — Firebase Storage 는 직접 받으면 막혀서(CORS) /api/stamp 중계로 받아요
 async function toDataUrl(url: string): Promise<string> {
   if (!url) return "";
   try {
-    const res = await fetch(url);
+    const res = await fetch(`/api/stamp?url=${encodeURIComponent(url)}`);
+    if (!res.ok) return "";
     const blob = await res.blob();
     return await new Promise(resolve => {
       const r = new FileReader();
