@@ -2,7 +2,9 @@
 // "거래명세표 출력" 버튼 — 고른 달(예: 2026-12)의 학교별 거래명세표를 만들어요.
 //   학교마다 zip 1개: {해당월}_{학교명}_{회사명}_거래명세표.zip  (예: 2612_대명여고_이가에프엔비_거래명세표.zip)
 //   zip 안: 납품일마다 PDF 1장  {학교명}({날짜}).pdf  — 날짜별 거래명세표(modal)와 같은 내용
-//   저장: Chrome/Edge 는 폴더를 고르면 그 안에 "output" 폴더를 만들어 저장. 안 되면 다운로드 폴더로 받음.
+//   저장: {고른 폴더}\output\{해당월}\  (예: C:\school\output\2611\…zip)
+//         처음 한 번만 폴더(C:\school)를 고르면 브라우저에 기억해 두고 다음부터 바로 저장. (Chrome·Edge)
+//         폴더 저장이 안 되는 브라우저면 다운로드 폴더로 받음.
 // 11월 말에 12월분을 미리 보내니까, 달력에서 다음 달을 고르고 누르면 돼요.
 
 import React, { useState } from "react";
@@ -14,6 +16,44 @@ const ALLOWED = ["이가에프엔비", "에스에이치유통"];
 type Item = { 식품명: string; 납품: Record<string, { 수량: number; 계약단가: number; 공급가액: number }> };
 type SchoolDoc = { 발주처: string; 사업자등록번호?: string; 사업장주소?: string; 대표전화번호?: string; 낙찰기업?: string; 납찰기업?: string; 품목?: Item[] };
 type Vendor = { 상호명?: string; 대표자?: string; 대표전화번호?: string; 사업자번호?: string; 사업자등록번호?: string; 주소?: string; 도장?: string };
+
+// 고른 폴더를 브라우저(IndexedDB)에 기억 — 다음에 다시 묻지 않게
+const IDB = "tkschool-statement", STORE = "handles", KEY = "baseDir";
+function idb<T>(mode: IDBTransactionMode, fn: (st: IDBObjectStore) => IDBRequest): Promise<T | undefined> {
+  return new Promise(resolve => {
+    try {
+      const open = indexedDB.open(IDB, 1);
+      open.onupgradeneeded = () => open.result.createObjectStore(STORE);
+      open.onerror = () => resolve(undefined);
+      open.onsuccess = () => {
+        const tx = open.result.transaction(STORE, mode);
+        const req = fn(tx.objectStore(STORE));
+        req.onsuccess = () => resolve(req.result as T);
+        req.onerror = () => resolve(undefined);
+      };
+    } catch { resolve(undefined); }
+  });
+}
+async function getBaseDir(forcePick = false): Promise<any | null> {
+  const picker = (window as any).showDirectoryPicker;
+  if (!picker) return null;
+  if (!forcePick) {
+    const saved: any = await idb("readonly", st => st.get(KEY));
+    if (saved) {
+      try {
+        let perm = await saved.queryPermission({ mode: "readwrite" });
+        if (perm !== "granted") perm = await saved.requestPermission({ mode: "readwrite" });
+        if (perm === "granted") return saved;
+      } catch { /* 다시 고르기 */ }
+    }
+  }
+  // 처음 한 번: 폴더 고르는 창 (C:\\school 을 고르면 그 안 output\\해당월 에 저장)
+  try {
+    const h = await picker({ id: "tkschool-statement", mode: "readwrite" });
+    await idb("readwrite", st => st.put(h, KEY));
+    return h;
+  } catch { return null; }
+}
 
 const won = (v: number) => (Number(v) || 0).toLocaleString();
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -99,9 +139,19 @@ async function htmlToPdf(html: string): Promise<Blob> {
 export default function StatementExport({ selectedYM, selectedVendor }: { selectedYM: string; selectedVendor: string }) {
   const [busy, setBusy] = useState("");
 
-  const run = async () => {
+  const run = async (forcePick = false) => {
     const ym = selectedYM.replace("-", "").slice(2);          // "2026-12" → "2612"
+    let base: any = null;
     try {
+      // 폴더 고르기·허락은 버튼을 누른 직후에 해야 해서 맨 먼저
+      // 저장할 곳: {고른 폴더}\output\{해당월}  (Shift 누르고 버튼을 누르면 폴더 다시 고르기)
+      let outDir: any = null;
+      base = await getBaseDir(forcePick);
+      if (base) {
+        const output = await base.getDirectoryHandle("output", { create: true });
+        outDir = await output.getDirectoryHandle(ym, { create: true });
+      }
+
       setBusy("학교 자료 불러오는 중…");
       const snap = await getDocs(collection(db, "school"));
       const schools = snap.docs
@@ -111,16 +161,6 @@ export default function StatementExport({ selectedYM, selectedVendor }: { select
         .filter(s => ALLOWED.includes(s.vendor) && (selectedVendor === "전체" || s.vendor === selectedVendor))
         .filter(s => (s.품목 || []).some(it => it.납품 && Object.keys(it.납품).some(dt => dt.startsWith(selectedYM))));
       if (!schools.length) { alert(`${selectedYM} 에 납품할 학교가 없어요. 업로드가 끝났는지 확인해 주세요.`); return; }
-
-      // 저장할 곳: 폴더 고르기 (Chrome·Edge) → 그 안에 output 폴더
-      let outDir: any = null;
-      const picker = (window as any).showDirectoryPicker;
-      if (picker && confirm(`${selectedYM} 거래명세표 ${schools.length}개 학교를 만들어요.\n\n[확인] 저장할 폴더 고르기 (그 안에 output 폴더를 만들어요)\n[취소] 다운로드 폴더로 받기`)) {
-        try {
-          const base = await picker({ id: "tkschool-statement", mode: "readwrite" });
-          outDir = await base.getDirectoryHandle("output", { create: true });
-        } catch { outDir = null; }
-      }
 
       const JSZip = (await import("jszip")).default;
       const vendorCache: Record<string, { v: Vendor; stamp: string }> = {};
@@ -157,7 +197,7 @@ export default function StatementExport({ selectedYM, selectedVendor }: { select
           await new Promise(r => setTimeout(r, 400));
         }
       }
-      alert(`끝났어요. ${schools.length}개 학교 거래명세표 zip 을 ${outDir ? "고른 폴더의 output 폴더" : "다운로드 폴더"}에 저장했어요.`);
+      alert(`끝났어요. ${schools.length}개 학교 거래명세표 zip 을 ${outDir ? `${base.name}\\output\\${ym} 폴더` : "다운로드 폴더"}에 저장했어요.`);
     } catch (e: any) {
       alert(`거래명세표 만들기 실패: ${e?.message ?? e}`);
     } finally {
@@ -167,7 +207,8 @@ export default function StatementExport({ selectedYM, selectedVendor }: { select
 
   return (
     <>
-      <button onClick={run} disabled={!!busy} title="고른 달의 학교별 거래명세표(납품일별 PDF)를 학교마다 zip 으로 만들어요"
+      <button onClick={e => run(e.shiftKey)} disabled={!!busy}
+        title="고른 달의 학교별 거래명세표(납품일별 PDF)를 학교마다 zip 으로 만들어 output\해당월 폴더에 저장해요. 저장 폴더를 바꾸려면 Shift 를 누른 채로 누르세요"
         className="px-4 py-2 bg-indigo-600 text-white rounded cursor-pointer disabled:opacity-60">
         {busy ? "만드는 중…" : "거래명세표 출력"}
       </button>
